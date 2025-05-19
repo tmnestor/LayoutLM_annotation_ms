@@ -293,8 +293,9 @@ for img in "${images[@]}"; do
     echo "First 5 values in column $id_col:"
     awk -F, -v col="$id_col" 'NR<=6 {print $col}' "$csv_path"
     
-    echo "Looking for value: '$page_id'"
-    echo "Found $(echo "$image_rows" | wc -l) matching rows"
+    echo "Looking for: '$page_id'"
+    echo "In column: $id_col ('$col_name')"
+    echo "RESULT: Found $(echo "$image_rows" | wc -l) matching rows"
     echo "===== END DEBUG INFO =====\n"
   fi
   
@@ -328,11 +329,12 @@ for img in "${images[@]}"; do
     echo "First 5 values in column $id_col:"
     awk -F, -v col="$id_col" 'NR<=6 {print $col}' "$csv_path"
     
-    echo "Looking for value: '$page_id'"
+    echo "Looking for: '$page_id'"
+    echo "In column: $id_col ('$col_name')"
+    echo "RESULT: No data rows found for '$page_id' in '$col_name' column"
     echo "===== END DEBUG INFO =====\n"
     
     # Exit after first error
-    echo "ERROR: No data rows found for '$page_id' in '$col_name' column"
     echo "Exiting after first error for diagnosis"
     exit 1
     

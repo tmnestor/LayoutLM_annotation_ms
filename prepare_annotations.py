@@ -237,7 +237,7 @@ def generate_annotation_files(cases_dir: str, labels_dir: str, images: List[Tupl
             print(f"Looking for: '{page_id}'")
             print(f"In column: {page_id_column} ('{headers[page_id_column]}')")
             print(f"First 5 values in this column: {[row[page_id_column] for row in rows[:5] if len(row) > page_id_column]}")
-            print(f"Found {len(image_rows)} matching rows")
+            print(f"RESULT: Found {len(image_rows)} matching rows")
             print("===== END DEBUG INFO =====\n")
         
         if not image_rows:
@@ -263,7 +263,7 @@ def generate_annotation_files(cases_dir: str, labels_dir: str, images: List[Tupl
             print("===== END DEBUG INFO =====\n")
             
             # Exit after the first failure
-            print(f"ERROR: No data rows found for '{page_id}' in '{headers[page_id_column]}' column")
+            print(f"RESULT: No data rows found for '{page_id}' in '{headers[page_id_column]}' column")
             print("Exiting after first error for diagnosis")
             sys.exit(1)
             
