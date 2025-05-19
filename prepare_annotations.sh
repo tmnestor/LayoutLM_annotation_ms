@@ -145,11 +145,30 @@ done < <(awk -F, 'NR>1 {gsub(/[" ]/, "", $1); gsub(/[" ]/, "", $2); print $1 ","
 
 echo "Loaded ${#images[@]} images to annotate"
 
+# Print information about what we're looking for
+echo -e "\n===== SOURCE FILE INFO ====="
+echo "Reading image list from: $IMAGES_FILE"
+echo "First 5 entries from image list:"
+count=0
+for img in "${images[@]}"; do
+  if [[ $count -lt 5 ]]; then
+    IFS=, read -r c_id p_id <<< "$img"
+    echo "  $((count+1)). Case ID: $c_id, Page ID: $p_id"
+    count=$((count+1))
+  fi
+done
+
+if [[ ${#images[@]} -gt 5 ]]; then
+  echo "  ... and $((${#images[@]} - 5)) more entries"
+fi
+echo "===== END SOURCE FILE INFO =====\n"
+
 # Step 3: Process each image
 successful_files=()
 successful_copies=()
 failed_copies=()
 missing_files=()
+first_success_debug_shown=false
 
 for img in "${images[@]}"; do
   IFS=, read -r case_id page_id <<< "$img"
@@ -242,6 +261,42 @@ for img in "${images[@]}"; do
   
   # Find rows matching this image's id (either page_id or image_id) with exact matching
   image_rows=$(awk -F, -v col="$id_col" -v id="$page_id" '$col == id {print $0}' "$csv_path" | grep -v "^$header")
+  
+  # Show debug info for the first successful case
+  if [[ -n "$image_rows" && "$first_success_debug_shown" = false ]]; then
+    first_success_debug_shown=true
+    echo -e "\n===== DEBUG INFO FOR FIRST SUCCESS ====="
+    echo "Case ID: $case_id, Page ID: $page_id"
+    echo "CSV File: $csv_path"
+    echo "CSV Header: $header"
+    
+    # Show headers with line numbers
+    echo "Headers split by comma (with line numbers):"
+    echo "$header" | tr ',' '\n' | nl
+    
+    # Show which column is being used
+    if echo "$header" | grep -q "page_id"; then
+      echo "Using 'page_id' column at position $id_col"
+    elif echo "$header" | grep -q "image_id"; then
+      echo "Using 'image_id' column at position $id_col"
+    else
+      echo "Neither 'page_id' nor 'image_id' found in headers!"
+    fi
+    
+    echo "Column name at position $id_col is '$col_name'"
+    
+    # Show sample data
+    echo "Sample data (first 3 rows):"
+    head -n 3 "$csv_path"
+    
+    # Show values in id column for first 5 rows
+    echo "First 5 values in column $id_col:"
+    awk -F, -v col="$id_col" 'NR<=6 {print $col}' "$csv_path"
+    
+    echo "Looking for value: '$page_id'"
+    echo "Found $(echo "$image_rows" | wc -l) matching rows"
+    echo "===== END DEBUG INFO =====\n"
+  fi
   
   if [[ -z "$image_rows" ]]; then
     # Only print debug info for the first failure

@@ -135,6 +135,19 @@ def generate_annotation_files(cases_dir: str, labels_dir: str, images: List[Tupl
     successful_files = []
     missing_files = []
     
+    # Track if we've shown debug info for the first success
+    first_success_debug_shown = False
+    
+    # Print information about what we're looking for
+    print("\n===== SOURCE FILE INFO =====")
+    print(f"Reading image list from: {args.images_file if args else 'data/annotation_images.csv'}")
+    print(f"First 5 entries from image list:")
+    for i, (c_id, p_id) in enumerate(images[:5]):
+        print(f"  {i+1}. Case ID: {c_id}, Page ID: {p_id}")
+    if len(images) > 5:
+        print(f"  ... and {len(images) - 5} more entries")
+    print("===== END SOURCE FILE INFO =====\n")
+    
     for case_id, page_id in images:
         # Check if case directory exists
         case_dir = os.path.join(cases_dir, case_id)
@@ -202,6 +215,30 @@ def generate_annotation_files(cases_dir: str, labels_dir: str, images: List[Tupl
             
         # Filter rows for this image using exact matching
         image_rows = [row for row in rows if row[page_id_column] == page_id]
+        
+        # Show debug info for the first successful case
+        if image_rows and not first_success_debug_shown:
+            first_success_debug_shown = True
+            print("\n===== DEBUG INFO FOR FIRST SUCCESS =====")
+            print(f"Case ID: {case_id}, Page ID: {page_id}")
+            print(f"CSV File: {csv_path}")
+            print(f"CSV Headers: {headers}")
+            
+            # Find which column is used
+            if "page_id" in headers:
+                print(f"Using 'page_id' column at position {headers.index('page_id')}")
+            elif "image_id" in headers:
+                print(f"Using 'image_id' column at position {headers.index('image_id')}")
+            else:
+                print("Neither 'page_id' nor 'image_id' found in headers!")
+                
+            # Show the first few rows and the values in the id column
+            print(f"First row of data: {rows[0] if rows else 'No rows'}")
+            print(f"Looking for: '{page_id}'")
+            print(f"In column: {page_id_column} ('{headers[page_id_column]}')")
+            print(f"First 5 values in this column: {[row[page_id_column] for row in rows[:5] if len(row) > page_id_column]}")
+            print(f"Found {len(image_rows)} matching rows")
+            print("===== END DEBUG INFO =====\n")
         
         if not image_rows:
             # Only print debug info for the first failure
