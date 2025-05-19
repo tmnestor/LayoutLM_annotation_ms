@@ -169,6 +169,7 @@ successful_copies=()
 failed_copies=()
 missing_files=()
 first_success_debug_shown=false
+first_failure_debug_shown=false
 
 for img in "${images[@]}"; do
   IFS=, read -r case_id page_id <<< "$img"
@@ -299,8 +300,9 @@ for img in "${images[@]}"; do
     echo "===== END DEBUG INFO =====\n"
   fi
   
-  if [[ -z "$image_rows" ]]; then
+  if [[ -z "$image_rows" && "$first_failure_debug_shown" = false ]]; then
     # Only print debug info for the first failure
+    first_failure_debug_shown=true
     echo -e "\n===== DEBUG INFO FOR FIRST FAILURE ====="
     echo "Case ID: $case_id, Page ID: $page_id"
     echo "CSV File: $csv_path"
@@ -334,10 +336,13 @@ for img in "${images[@]}"; do
     echo "RESULT: No data rows found for '$page_id' in '$col_name' column"
     echo "===== END DEBUG INFO =====\n"
     
-    # Exit after first error
-    echo "Exiting after first error for diagnosis"
-    exit 1
+    # Continue with processing remaining files
+    echo "Continuing processing remaining files..."
     
+    missing_files+=("$case_id/$page_id: No data rows found for '$page_id' in '$col_name' column")
+    continue
+  elif [[ -z "$image_rows" ]]; then
+    # Just add to missing files without debug output for subsequent failures
     missing_files+=("$case_id/$page_id: No data rows found for '$page_id' in '$col_name' column")
     continue
   fi

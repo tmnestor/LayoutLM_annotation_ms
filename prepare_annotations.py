@@ -135,8 +135,9 @@ def generate_annotation_files(cases_dir: str, labels_dir: str, images: List[Tupl
     successful_files = []
     missing_files = []
     
-    # Track if we've shown debug info for the first success
+    # Track if we've shown debug info for the first success and first failure
     first_success_debug_shown = False
+    first_failure_debug_shown = False
     
     # Print information about what we're looking for
     print("\n===== SOURCE FILE INFO =====")
@@ -240,8 +241,9 @@ def generate_annotation_files(cases_dir: str, labels_dir: str, images: List[Tupl
             print(f"RESULT: Found {len(image_rows)} matching rows")
             print("===== END DEBUG INFO =====\n")
         
-        if not image_rows:
+        if not image_rows and not first_failure_debug_shown:
             # Only print debug info for the first failure
+            first_failure_debug_shown = True
             print("\n===== DEBUG INFO FOR FIRST FAILURE =====")
             print(f"Case ID: {case_id}, Page ID: {page_id}")
             print(f"CSV File: {csv_path}")
@@ -262,11 +264,11 @@ def generate_annotation_files(cases_dir: str, labels_dir: str, images: List[Tupl
             print(f"First 5 values in this column: {[row[page_id_column] for row in rows[:5] if len(row) > page_id_column]}")
             print("===== END DEBUG INFO =====\n")
             
-            # Exit after the first failure
+            # Print result for the first failure but don't exit
             print(f"RESULT: No data rows found for '{page_id}' in '{headers[page_id_column]}' column")
-            print("Exiting after first error for diagnosis")
-            sys.exit(1)
-            
+            print("Continuing processing remaining files...")
+        elif not image_rows:
+            # Just add to missing files without debug output for subsequent failures
             missing_files.append((case_id, page_id, f"No data rows found for '{page_id}' in '{headers[page_id_column]}' column"))
             continue
             
