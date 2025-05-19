@@ -228,10 +228,10 @@ for img in "${images[@]}"; do
   # First, check if the CSV uses page_id or image_id column
   if echo "$header" | grep -q "page_id"; then
     # Get column index for page_id (1-based for awk)
-    id_col=$(echo "$header" | tr ',' '\n' | grep -n -i "page_id" | cut -d':' -f1)
+    id_col=$(echo "$header" | tr ',' '\n' | grep -n "page_id" | cut -d':' -f1)
   elif echo "$header" | grep -q "image_id"; then
     # Get column index for image_id (1-based for awk)
-    id_col=$(echo "$header" | tr ',' '\n' | grep -n -i "image_id" | cut -d':' -f1)
+    id_col=$(echo "$header" | tr ',' '\n' | grep -n "image_id" | cut -d':' -f1)
   else
     # If neither page_id nor image_id found, use the first column
     id_col=1
@@ -244,6 +244,43 @@ for img in "${images[@]}"; do
   image_rows=$(awk -F, -v col="$id_col" -v id="$page_id" '$col == id {print $0}' "$csv_path" | grep -v "^$header")
   
   if [[ -z "$image_rows" ]]; then
+    # Only print debug info for the first failure
+    echo -e "\n===== DEBUG INFO FOR FIRST FAILURE ====="
+    echo "Case ID: $case_id, Page ID: $page_id"
+    echo "CSV File: $csv_path"
+    echo "CSV Header: $header"
+    
+    # Show headers with line numbers
+    echo "Headers split by comma (with line numbers):"
+    echo "$header" | tr ',' '\n' | nl
+    
+    # Show which column is being used
+    if echo "$header" | grep -q "page_id"; then
+      echo "Using 'page_id' column at position $id_col"
+    elif echo "$header" | grep -q "image_id"; then
+      echo "Using 'image_id' column at position $id_col"
+    else
+      echo "Neither 'page_id' nor 'image_id' found in headers!"
+    fi
+    
+    echo "Column name at position $id_col is '$col_name'"
+    
+    # Show sample data
+    echo "Sample data (first 3 rows):"
+    head -n 3 "$csv_path"
+    
+    # Show values in id column for first 5 rows
+    echo "First 5 values in column $id_col:"
+    awk -F, -v col="$id_col" 'NR<=6 {print $col}' "$csv_path"
+    
+    echo "Looking for value: '$page_id'"
+    echo "===== END DEBUG INFO =====\n"
+    
+    # Exit after first error
+    echo "ERROR: No data rows found for '$page_id' in '$col_name' column"
+    echo "Exiting after first error for diagnosis"
+    exit 1
+    
     missing_files+=("$case_id/$page_id: No data rows found for '$page_id' in '$col_name' column")
     continue
   fi
