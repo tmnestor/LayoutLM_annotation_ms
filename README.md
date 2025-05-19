@@ -80,6 +80,8 @@ If hyperlinks in Excel don't work correctly:
    ```bash
    ./prepare_annotations.py --network-share Z:
    ```
+   Note: In our environment, Z: is mapped to:
+   `\\PROTSHR01L5028V\SDP Streamlining Substantiation Data (PROTECTED)$\Document Understanding\form_recognizer\gold`
    
 2. **Check for extra quotes**: If your hyperlinks have double quotes like `""Z:\path""`, this may be due to Excel's CSV handling. The scripts have been updated to prevent this issue.
 
@@ -177,6 +179,9 @@ When images and labels will be accessed from a different system than where you p
      
      This approach uses a mapped network drive (Z:) instead of a UNC path, which often works better with Excel hyperlinks.
      The Excel HYPERLINK formulas will have paths like: `Z:\annotation_images\...`
+     
+     **Note:** In our environment, the Z: drive is mapped to:  
+     `\\PROTSHR01L5028V\SDP Streamlining Substantiation Data (PROTECTED)$\Document Understanding\form_recognizer\gold`
      
      **For Windows network share with UNC path:**
      ```bash
