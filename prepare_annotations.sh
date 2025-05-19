@@ -237,11 +237,18 @@ for img in "${images[@]}"; do
     id_col=1
   fi
   
-  # Find rows matching this image's id (either page_id or image_id)
-  image_rows=$(awk -F, -v col="$id_col" -v id="$page_id" '$col == id {print $0}' "$csv_path" | grep -v "^$header")
+  # Print debug information
+  col_name=$(echo "$header" | tr ',' '\n' | sed -n "${id_col}p")
+  echo "Looking for page_id '$page_id' in column $id_col ('$col_name')"
+  available_values=$(awk -F, -v col="$id_col" '{print $col}' "$csv_path" | grep -v "^$col_name")
+  echo "Available values in this column: $available_values"
+
+  # Find rows matching this image's id (either page_id or image_id) with case-insensitive comparison
+  # Using the 'tolower' function in awk for case-insensitive comparison
+  image_rows=$(awk -F, -v col="$id_col" -v id="$page_id" 'tolower($col) == tolower(id) {print $0}' "$csv_path" | grep -v "^$header")
   
   if [[ -z "$image_rows" ]]; then
-    missing_files+=("$case_id/$page_id: No data rows found for this image")
+    missing_files+=("$case_id/$page_id: No data rows found for '$page_id' in '$col_name' column")
     continue
   fi
   

@@ -15,7 +15,7 @@ import csv
 import os
 import shutil
 import sys
-from typing import Dict, List, Set, Tuple
+from typing import List, Tuple
 
 
 def load_images_to_annotate(images_file: str) -> List[Tuple[str, str]]:
@@ -39,7 +39,7 @@ def load_images_to_annotate(images_file: str) -> List[Tuple[str, str]]:
         
         # Verify required columns
         if "case_id" not in reader.fieldnames or "page_id" not in reader.fieldnames:
-            print(f"Error: Images file must contain 'case_id' and 'page_id' columns")
+            print("Error: Images file must contain 'case_id' and 'page_id' columns")
             sys.exit(1)
             
         for row in reader:
@@ -185,7 +185,7 @@ def generate_annotation_files(cases_dir: str, labels_dir: str, images: List[Tupl
                 headers = next(reader)  # Get the header row
                 rows = list(reader)  # Get all data rows
         except Exception as e:
-            missing_files.append((case_id, image_id, f"Error reading CSV: {str(e)}"))
+            missing_files.append((case_id, page_id, f"Error reading CSV: {str(e)}"))
             continue
             
         # Add the annotator label column to headers
@@ -199,11 +199,15 @@ def generate_annotation_files(cases_dir: str, labels_dir: str, images: List[Tupl
             # For backward compatibility with older files that use image_id
             page_id_column = [col.lower() for col in headers].index("image_id")
             
-        # Filter rows for this image using page_id
-        image_rows = [row for row in rows if row[page_id_column] == page_id]
+        # Print debug information
+        print(f"Looking for page_id '{page_id}' in column {page_id_column} ('{headers[page_id_column]}')")
+        print(f"Available values in this column: {[row[page_id_column] for row in rows]}")
+        
+        # Filter rows for this image using page_id, with case-insensitive comparison
+        image_rows = [row for row in rows if row[page_id_column].lower() == page_id.lower()]
         
         if not image_rows:
-            missing_files.append((case_id, page_id, "No data rows found for this image in page_id column"))
+            missing_files.append((case_id, page_id, f"No data rows found for '{page_id}' in '{headers[page_id_column]}' column"))
             continue
             
         # Create the annotation file
