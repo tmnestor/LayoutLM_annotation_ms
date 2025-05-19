@@ -25,9 +25,50 @@ The system works with the existing DU-SSD directory structure where:
 │   ├── master.csv          # Master tracking file
 │   └── completion_updates.csv # Template for batch updates
 ├── du_cases/               # Main case directory structure
+│   ├── 1-12ABCDEF/         # Example case directory
+│   │   ├── images/         # Contains all page images for this case
+│   │   │   ├── 9876543210_01_0.jpeg
+│   │   │   └── ...
+│   │   └── processing/
+│   │       └── form-recogniser/ 
+│   │           └── df_check.csv  # LayoutLM processing results
 ├── annotation_labels/       # Generated annotation files
 └── reports/                # Generated reports
 ```
+
+## Source Data Format: df_check.csv
+
+The system relies on `df_check.csv` files located in each case directory at `du_cases/{case_id}/processing/form-recogniser/df_check.csv`. These files are critical for creating annotation files.
+
+### df_check.csv Format
+
+Each df_check.csv file contains LayoutLM processing results with the following columns:
+
+- `image_id` - **IMPORTANT**: This column must contain the exact same values as the `page_id` column in `data/annotation_images.csv`. This is used for matching records.
+- `block_ids` - Block identifier 
+- `word_ids` - Word identifier
+- `words` - Text content
+- `bboxes` - Bounding box coordinates
+- `labels` - Original label
+- `pred` - Prediction value
+- `prob` - Probability score
+
+### How df_check.csv is Used
+
+1. The system reads `data/annotation_images.csv` to get a list of images to process
+2. For each (case_id, page_id) pair, it looks for matching records in `df_check.csv` where:
+   - The system looks for the `image_id` column in df_check.csv
+   - It searches for rows where `image_id` **exactly matches** the `page_id` value from annotation_images.csv
+3. All matching rows are extracted to create individual annotation CSV files
+4. An additional `annotator_label` column is added for human annotations
+
+### Troubleshooting df_check.csv Issues
+
+If you encounter errors like "No data rows found for [page_id] in 'image_id' column", check:
+1. The `image_id` values in df_check.csv match exactly with the `page_id` values in annotation_images.csv
+2. The df_check.csv exists in the expected location
+3. The df_check.csv contains the proper column headers
+4. The df_check.csv has entries for all required page_id values
 
 ## Quick Start
 
@@ -280,3 +321,12 @@ Contains columns:
 
 ### annotation_labels/*.csv
 Contains form recognition data with an added annotator_label column.
+
+### du_cases/{case_id}/processing/form-recogniser/df_check.csv
+Contains the LayoutLM model output data with columns:
+```
+image_id,block_ids,word_ids,words,bboxes,labels,pred,prob
+9876543210_01_0,1,10,form,"(10, 20, 100, 40)",FIELD,0,0.95
+```
+
+**CRITICAL**: The `image_id` column in this file must contain values that exactly match the `page_id` values in `data/annotation_images.csv`. This is the key matching field used to extract the right data for each image. If this matching fails, you'll see errors like "No data rows found for [page_id] in 'image_id' column".
