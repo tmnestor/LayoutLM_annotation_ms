@@ -62,13 +62,28 @@ Each df_check.csv file contains LayoutLM processing results with the following c
 3. All matching rows are extracted to create individual annotation CSV files
 4. An additional `annotator_label` column is added for human annotations
 
-### Troubleshooting df_check.csv Issues
+### Troubleshooting Common Issues
+
+#### df_check.csv Errors
 
 If you encounter errors like "No data rows found for [page_id] in 'image_id' column", check:
 1. The `image_id` values in df_check.csv match exactly with the `page_id` values in annotation_images.csv
 2. The df_check.csv exists in the expected location
 3. The df_check.csv contains the proper column headers
 4. The df_check.csv has entries for all required page_id values
+
+#### Excel Hyperlink Issues
+
+If hyperlinks in Excel don't work correctly:
+
+1. **Use mapped drives instead of UNC paths**: 
+   ```bash
+   ./prepare_annotations.py --network-share Z:
+   ```
+   
+2. **Check for extra quotes**: If your hyperlinks have double quotes like `""Z:\path""`, this may be due to Excel's CSV handling. The scripts have been updated to prevent this issue.
+
+3. **Manual fix in Excel**: If hyperlinks still don't work, you can select the columns with hyperlinks in Excel, right-click and choose "Remove Hyperlink", then select all cells again and use the HYPERLINK function to recreate them.
 
 ## Quick Start
 
@@ -108,7 +123,11 @@ When images and CSV files are in non-standard locations:
 Generate hyperlinks pointing to a Windows share:
 
 ```bash
+# Using UNC path
 ./prepare_annotations.py --network-share "\\\\server\\share"
+
+# Using mapped network drive (recommended for Excel compatibility)
+./prepare_annotations.py --network-share Z:
 ```
 
 ### 4. Full Custom Configuration
@@ -151,7 +170,15 @@ When images and labels will be accessed from a different system than where you p
    - Edit `data/annotation_images.csv` with the images to annotate
    - Run prepare_annotations.py with the network share option and copy-images option:
    
-     **For Windows network share (recommended):**
+     **For Windows mapped drives (recommended for Excel compatibility):**
+     ```bash
+     ./prepare_annotations.py --network-share Z:
+     ```
+     
+     This approach uses a mapped network drive (Z:) instead of a UNC path, which often works better with Excel hyperlinks.
+     The Excel HYPERLINK formulas will have paths like: `Z:\annotation_images\...`
+     
+     **For Windows network share with UNC path:**
      ```bash
      ./prepare_annotations.py --network-share "\\\\server\\share"
      ```

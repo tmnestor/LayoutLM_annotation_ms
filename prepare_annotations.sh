@@ -390,8 +390,8 @@ if [[ ${#successful_files[@]} -gt 0 ]]; then
     image_path="${NETWORK_SHARE}\\annotation_images\\${case_id}_${page_id}.jpeg"
     label_path="${NETWORK_SHARE}\\annotation_labels\\${case_id}_${page_id}.csv"
     
-    # Create the CSV row with Excel HYPERLINK formulas
-    echo "$case_id,$page_id,=HYPERLINK(\"$image_path\",\"View image\"),=HYPERLINK(\"$label_path\",\"View labels\"),${ANNOTATORS[0]},no,${ANNOTATORS[1]},no," >> "$MASTER_FILE"
+    # Create the CSV row with Excel HYPERLINK formulas - without quotes to prevent Excel quoting issues
+    echo "$case_id,$page_id,=HYPERLINK($image_path,View image),=HYPERLINK($label_path,View labels),${ANNOTATORS[0]},no,${ANNOTATORS[1]},no," >> "$MASTER_FILE"
   done
   
   echo "Created master tracking file with ${#successful_files[@]} entries: $MASTER_FILE"

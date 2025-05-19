@@ -329,11 +329,13 @@ def create_master_file(
         label_path = f"{network_share}\\annotation_labels\\{case_id}_{page_id}.csv"
         
         # Create a row for the master CSV with Excel HYPERLINK formulas
+        # Use single quotes for the outer string and no quotes for the formula 
+        # to prevent double-quoting in the CSV output
         row = {
             "case_id": case_id,
             "page_id": page_id,
-            "image_file_path": f'=HYPERLINK("{image_path}","View image")',
-            "label_file_path": f'=HYPERLINK("{label_path}","View labels")',
+            "image_file_path": f'=HYPERLINK({image_path},View image)',
+            "label_file_path": f'=HYPERLINK({label_path},View labels)',
             "assignee1": annotators[0],
             "has_assignee1_completed": "no",
             "assignee2": annotators[1],
