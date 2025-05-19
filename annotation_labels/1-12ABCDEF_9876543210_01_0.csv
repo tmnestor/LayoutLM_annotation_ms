@@ -1,0 +1,4 @@
+image_id,block_ids,word_ids,words,bboxes,labels,pred,prob,annotator_label
+9876543210_01_0,1,10,form,"(10, 20, 100, 40)",FIELD,0,0.95,
+9876543210_01_0,2,11,document,"(150, 25, 250, 45)",VALUE,1,0.87,
+9876543210_01_0,3,12,number,"(300, 30, 400, 50)",OTHER,0,0.76,

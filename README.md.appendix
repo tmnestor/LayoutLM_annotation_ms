@@ -1,0 +1,67 @@
+## Example Use Cases
+
+Here are detailed examples for various use cases:
+
+### 1. Standard Workflow
+
+When your files follow the standard directory structure:
+
+```bash
+./prepare_annotations.py
+```
+
+This will:
+- Look for images in `du_cases/{case_id}/images/{page_id}.jpeg`
+- Look for CSV data in `du_cases/{case_id}/processing/form-recognizer/df_check.csv`
+- Generate annotation files in `annotation_labels/`
+- Copy images to `annotation_images/`
+
+### 2. Custom File Locations
+
+When your files are in non-standard locations:
+
+```bash
+./prepare_annotations.py \
+  --csv-path-template "/data/{case_id}/results/{page_id}_analysis.csv" \
+  --image-path-template "/scans/{case_id}/pages/{page_id}.jpeg"
+```
+
+This will:
+- Look for images in `/scans/{case_id}/pages/{page_id}.jpeg`
+- Look for CSV data in `/data/{case_id}/results/{page_id}_analysis.csv`
+- Still generate annotation files in `annotation_labels/` 
+- Still copy images to `annotation_images/`
+
+### 3. Windows Network Share Integration
+
+When you need to generate hyperlinks to a Windows network share:
+
+```bash
+./prepare_annotations.py --network-share "\\\\server\\share"
+```
+
+This will:
+- Create hyperlinks pointing to `\\server\share\annotation_images\...`
+- Create hyperlinks pointing to `\\server\share\annotation_labels\...`
+
+### 4. Complete Custom Setup
+
+For a fully customized workflow:
+
+```bash
+./prepare_annotations.py \
+  --network-share "\\\\server\\share" \
+  --csv-path-template "/data/{case_id}/results/{page_id}_analysis.csv" \
+  --image-path-template "/scans/{case_id}/pages/{page_id}.jpeg" \
+  --labels-dir "custom_labels" \
+  --images-dir "custom_images" \
+  --annotators "john" "sarah" "mike"
+```
+
+This will:
+- Look for images in `/scans/{case_id}/pages/{page_id}.jpeg`
+- Look for CSV data in `/data/{case_id}/results/{page_id}_analysis.csv`
+- Generate annotation files in `custom_labels/`
+- Copy images to `custom_images/`
+- Use "john", "sarah", and "mike" as annotators in the master file
+- Create hyperlinks pointing to the Windows share

@@ -1,0 +1,4 @@
+image_id,block_ids,word_ids,words,bboxes,labels,pred,prob,annotator_label
+5566778899_03_0,25,36,page,"(115, 125, 215, 145)",PAGE,0,0.82,
+5566778899_03_0,26,37,section,"(230, 130, 330, 150)",SECTION,0,0.88,
+5566778899_03_0,27,38,appendix,"(355, 135, 455, 155)",APPENDIX,0,0.90,
