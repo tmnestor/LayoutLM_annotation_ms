@@ -162,7 +162,7 @@ for img in "${images[@]}"; do
   
   # Build the CSV file path
   # Default CSV path
-  csv_path="$case_dir/processing/form-recognizer/df_check.csv"
+  csv_path="$case_dir/processing/form-recogniser/df_check.csv"
   
   # If a custom CSV path template is provided
   if [[ -n "$CSV_PATH_TEMPLATE" ]]; then
@@ -237,15 +237,11 @@ for img in "${images[@]}"; do
     id_col=1
   fi
   
-  # Print debug information
+  # Get column name for better error messages
   col_name=$(echo "$header" | tr ',' '\n' | sed -n "${id_col}p")
-  echo "Looking for page_id '$page_id' in column $id_col ('$col_name')"
-  available_values=$(awk -F, -v col="$id_col" '{print $col}' "$csv_path" | grep -v "^$col_name")
-  echo "Available values in this column: $available_values"
-
-  # Find rows matching this image's id (either page_id or image_id) with case-insensitive comparison
-  # Using the 'tolower' function in awk for case-insensitive comparison
-  image_rows=$(awk -F, -v col="$id_col" -v id="$page_id" 'tolower($col) == tolower(id) {print $0}' "$csv_path" | grep -v "^$header")
+  
+  # Find rows matching this image's id (either page_id or image_id) with exact matching
+  image_rows=$(awk -F, -v col="$id_col" -v id="$page_id" '$col == id {print $0}' "$csv_path" | grep -v "^$header")
   
   if [[ -z "$image_rows" ]]; then
     missing_files+=("$case_id/$page_id: No data rows found for '$page_id' in '$col_name' column")

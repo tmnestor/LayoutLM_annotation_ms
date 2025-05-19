@@ -143,7 +143,7 @@ def generate_annotation_files(cases_dir: str, labels_dir: str, images: List[Tupl
             continue
             
         # Build the df_check.csv path using the template
-        csv_path_template = os.path.join(case_dir, "processing", "form-recognizer", "df_check.csv")
+        csv_path_template = os.path.join(case_dir, "processing", "form-recogniser", "df_check.csv")
         csv_path = csv_path_template
         
         # If a custom CSV path template is provided
@@ -199,12 +199,8 @@ def generate_annotation_files(cases_dir: str, labels_dir: str, images: List[Tupl
             # For backward compatibility with older files that use image_id
             page_id_column = [col.lower() for col in headers].index("image_id")
             
-        # Print debug information
-        print(f"Looking for page_id '{page_id}' in column {page_id_column} ('{headers[page_id_column]}')")
-        print(f"Available values in this column: {[row[page_id_column] for row in rows]}")
-        
-        # Filter rows for this image using page_id, with case-insensitive comparison
-        image_rows = [row for row in rows if row[page_id_column].lower() == page_id.lower()]
+        # Filter rows for this image using exact matching
+        image_rows = [row for row in rows if row[page_id_column] == page_id]
         
         if not image_rows:
             missing_files.append((case_id, page_id, f"No data rows found for '{page_id}' in '{headers[page_id_column]}' column"))

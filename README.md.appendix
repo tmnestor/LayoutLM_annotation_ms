@@ -12,7 +12,7 @@ When your files follow the standard directory structure:
 
 This will:
 - Look for images in `du_cases/{case_id}/images/{page_id}.jpeg`
-- Look for CSV data in `du_cases/{case_id}/processing/form-recognizer/df_check.csv`
+- Look for CSV data in `du_cases/{case_id}/processing/form-recogniser/df_check.csv`
 - Generate annotation files in `annotation_labels/`
 - Copy images to `annotation_images/`
 
