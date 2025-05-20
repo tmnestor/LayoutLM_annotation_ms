@@ -324,18 +324,16 @@ def create_master_file(
     # Prepare the CSV data
     csv_data = []
     for case_id, page_id, image_file, label_file in successful_files:
-        # Standard network share paths
+        # Standard network share paths - store just the paths without hyperlink formatting
         image_path = f"{network_share}\\annotation_images\\{case_id}_{page_id}.jpeg"
         label_path = f"{network_share}\\annotation_labels\\{case_id}_{page_id}.csv"
         
-        # Create a row for the master CSV with Excel HYPERLINK formulas
-        # Use single quotes for the outer string and no quotes for the formula 
-        # to prevent double-quoting in the CSV output
+        # Create a row for the master CSV with the paths only - hyperlink formatting will be done at write time
         row = {
             "case_id": case_id,
             "page_id": page_id,
-            "image_file_path": f'=HYPERLINK({image_path},View image)',
-            "label_file_path": f'=HYPERLINK({label_path},View labels)',
+            "image_file_path": image_path,
+            "label_file_path": label_path,
             "assignee1": annotators[0],
             "has_assignee1_completed": "no",
             "assignee2": annotators[1],
@@ -351,10 +349,17 @@ def create_master_file(
         "assignee2", "has_assignee2_completed", "notes"
     ]
     
+    # Write the CSV file manually to avoid automatic quote escaping
     with open(master_file, 'w', newline='') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(csv_data)
+        # Write header
+        header_line = ','.join(fieldnames) + '\n'
+        csvfile.write(header_line)
+        
+        # Write each row manually
+        for row in csv_data:
+            # Format hyperlinks exactly as needed without automatic escaping
+            line = f"{row['case_id']},{row['page_id']},\"=HYPERLINK(\"{row['image_file_path']}\",\"View image\")\",\"=HYPERLINK(\"{row['label_file_path']}\",\"View labels\")\",{row['assignee1']},{row['has_assignee1_completed']},{row['assignee2']},{row['has_assignee2_completed']},{row['notes']}\n"
+            csvfile.write(line)
     
     print(f"Created master tracking file with {len(csv_data)} entries: {master_file}")
 
@@ -390,8 +395,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--network-share",
-        default="\\\\server\\share",
-        help="Network share path for hyperlinks (default: \\\\server\\share)",
+        default="Z:Document Understanding\\information_extraction\\gold\\doc filter\\2025 eval set",
+        help="Network share path for hyperlinks (default: Z:Document Understanding\\information_extraction\\gold\\doc filter\\2025 eval set)",
     )
     parser.add_argument(
         "--csv-path-template",

@@ -76,12 +76,16 @@ If you encounter errors like "No data rows found for [page_id] in 'image_id' col
 
 If hyperlinks in Excel don't work correctly:
 
-1. **Use mapped drives instead of UNC paths**: 
+1. **Use mapped drives with complete document path**: 
+   ```bash
+   ./prepare_annotations.py --network-share "Z:Document Understanding\information_extraction\gold\doc filter\2025 eval set"
+   ```
+   Note: In our environment, Z: is mapped to a network share with the specified subdirectories
+   
+   Or simply use the drive letter for root directory:
    ```bash
    ./prepare_annotations.py --network-share Z:
    ```
-   Note: In our environment, Z: is mapped to:
-   `\\PROTSHR01L5028V\SDP Streamlining Substantiation Data (PROTECTED)$\Document Understanding\form_recognizer\gold`
    
 2. **Check for extra quotes**: If your hyperlinks have double quotes like `""Z:\path""`, this may be due to Excel's CSV handling. The scripts have been updated to prevent this issue.
 
@@ -92,7 +96,14 @@ If hyperlinks in Excel don't work correctly:
 To prepare annotation files for a specific list of images:
 
 ```bash
+# Default usage
 ./prepare_annotations.py
+
+# Using mapped Z: drive with complete path (recommended for our environment)
+./prepare_annotations.py --network-share "Z:Document Understanding\information_extraction\gold\doc filter\2025 eval set"
+
+# Or simply use the drive letter for the root directory
+./prepare_annotations.py --network-share Z:
 ```
 
 This single script will:
@@ -174,14 +185,15 @@ When images and labels will be accessed from a different system than where you p
    
      **For Windows mapped drives (recommended for Excel compatibility):**
      ```bash
+     # Using full path - recommended for specific subfolders
+     ./prepare_annotations.py --network-share "Z:Document Understanding\information_extraction\gold\doc filter\2025 eval set"
+     
+     # Or using just the drive letter for root directory
      ./prepare_annotations.py --network-share Z:
      ```
      
      This approach uses a mapped network drive (Z:) instead of a UNC path, which often works better with Excel hyperlinks.
-     The Excel HYPERLINK formulas will have paths like: `Z:\annotation_images\...`
-     
-     **Note:** In our environment, the Z: drive is mapped to:  
-     `\\PROTSHR01L5028V\SDP Streamlining Substantiation Data (PROTECTED)$\Document Understanding\form_recognizer\gold`
+     The Excel HYPERLINK formulas will have paths like: `Z:Document Understanding\information_extraction\gold\doc filter\2025 eval set\annotation_images\...`
      
      **For Windows network share with UNC path:**
      ```bash
