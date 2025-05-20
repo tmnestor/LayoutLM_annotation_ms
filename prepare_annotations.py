@@ -12,9 +12,9 @@ The master file includes hyperlinks to images and label files on a network share
 
 import argparse
 import csv
-import os
 import shutil
 import sys
+from pathlib import Path
 from typing import List, Tuple
 
 # Try to import xlsxwriter but don't fail if it's not available
@@ -36,13 +36,13 @@ def load_images_to_annotate(images_file: str) -> List[Tuple[str, str]]:
     Returns:
         List of (case_id, page_id) tuples
     """
-    if not os.path.exists(images_file):
+    if not Path(images_file).exists():
         print(f"Error: Images file not found: {images_file}")
         sys.exit(1)
 
     images = []
 
-    with open(images_file, "r", newline="") as csvfile:
+    with Path(images_file).open("r", newline="") as csvfile:
         reader = csv.DictReader(csvfile)
 
         # Verify required columns
@@ -73,37 +73,42 @@ def copy_image_files(
         List of (case_id, page_id, copied_image_path) tuples for successfully copied files
     """
     # Create images directory if it doesn't exist
-    os.makedirs(images_dir, exist_ok=True)
+    Path(images_dir).mkdir(parents=True, exist_ok=True)
 
     successful_copies = []
     failed_copies = []
 
     for case_id, page_id in images:
         # Check if case directory exists
-        case_dir = os.path.join(cases_dir, case_id)
-        if not os.path.isdir(case_dir):
+        case_dir = str(Path(cases_dir) / case_id)
+        if not Path(case_dir).is_dir():
             failed_copies.append((case_id, page_id, "Case directory not found"))
             continue
 
         # Build the image file path using the template
         image_file = f"{page_id}.jpeg"
-        source_path_template = os.path.join(case_dir, "images", image_file)
+        source_path_template = str(Path(case_dir) / "images" / image_file)
         source_path = source_path_template
 
         # If a custom image path template is provided
         if args and hasattr(args, "image_path_template") and args.image_path_template:
             # Replace {case_id} and {page_id} if present
             source_path = args.image_path_template.format(
-                case_id=case_id, page_id=page_id, image_file=image_file, case_dir=case_dir
+                case_id=case_id,
+                page_id=page_id,
+                image_file=image_file,
+                case_dir=case_dir,
             )
 
-        if not os.path.exists(source_path):
-            failed_copies.append((case_id, page_id, f"Image file not found at: {source_path}"))
+        if not Path(source_path).exists():
+            failed_copies.append(
+                (case_id, page_id, f"Image file not found at: {source_path}")
+            )
             continue
 
         # Create a destination path with case_id prefix to avoid name collisions
         dest_file = f"{case_id}_{image_file}"
-        dest_path = os.path.join(images_dir, dest_file)
+        dest_path = str(Path(images_dir) / dest_file)
 
         try:
             # Copy the image file
@@ -139,7 +144,7 @@ def generate_annotation_files(
         List of (case_id, page_id, image_path, label_path) tuples for successfully created files
     """
     # Create labels directory if it doesn't exist
-    os.makedirs(labels_dir, exist_ok=True)
+    Path(labels_dir).mkdir(parents=True, exist_ok=True)
 
     successful_files = []
     missing_files = []
@@ -150,7 +155,9 @@ def generate_annotation_files(
 
     # Print information about what we're looking for
     print("\n===== SOURCE FILE INFO =====")
-    print(f"Reading image list from: {args.images_file if args else 'data/annotation_images.csv'}")
+    print(
+        f"Reading image list from: {args.images_file if args else 'data/annotation_images.csv'}"
+    )
     print("First 5 entries from image list:")
     for i, (c_id, p_id) in enumerate(images[:5]):
         print(f"  {i + 1}. Case ID: {c_id}, Page ID: {p_id}")
@@ -160,43 +167,54 @@ def generate_annotation_files(
 
     for case_id, page_id in images:
         # Check if case directory exists
-        case_dir = os.path.join(cases_dir, case_id)
-        if not os.path.isdir(case_dir):
+        case_dir = str(Path(cases_dir) / case_id)
+        if not Path(case_dir).is_dir():
             missing_files.append((case_id, page_id, "Case directory not found"))
             continue
 
         # Build the df_check.csv path using the template
-        csv_path_template = os.path.join(case_dir, "processing", "form-recogniser", "df_check.csv")
+        csv_path_template = str(
+            Path(case_dir) / "processing" / "form-recogniser" / "df_check.csv"
+        )
         csv_path = csv_path_template
 
         # If a custom CSV path template is provided
         if hasattr(args, "csv_path_template") and args.csv_path_template:
             # Replace {case_id} and {page_id} if present
-            csv_path = args.csv_path_template.format(case_id=case_id, page_id=page_id, case_dir=case_dir)
+            csv_path = args.csv_path_template.format(
+                case_id=case_id, page_id=page_id, case_dir=case_dir
+            )
 
-        if not os.path.exists(csv_path):
-            missing_files.append((case_id, page_id, f"CSV file not found at: {csv_path}"))
+        if not Path(csv_path).exists():
+            missing_files.append(
+                (case_id, page_id, f"CSV file not found at: {csv_path}")
+            )
             continue
 
         # Build the image file path using the template
         image_file = f"{page_id}.jpeg"
-        image_path_template = os.path.join(case_dir, "images", image_file)
+        image_path_template = str(Path(case_dir) / "images" / image_file)
         image_path = image_path_template
 
         # If a custom image path template is provided
         if hasattr(args, "image_path_template") and args.image_path_template:
             # Replace {case_id} and {page_id} if present
             image_path = args.image_path_template.format(
-                case_id=case_id, page_id=page_id, image_file=image_file, case_dir=case_dir
+                case_id=case_id,
+                page_id=page_id,
+                image_file=image_file,
+                case_dir=case_dir,
             )
 
-        if not os.path.exists(image_path):
-            missing_files.append((case_id, page_id, f"Image file not found at: {image_path}"))
+        if not Path(image_path).exists():
+            missing_files.append(
+                (case_id, page_id, f"Image file not found at: {image_path}")
+            )
             continue
 
         # Load the CSV data
         try:
-            with open(csv_path, "r", newline="") as csvfile:
+            with Path(csv_path).open("r", newline="") as csvfile:
                 reader = csv.reader(csvfile)
                 headers = next(reader)  # Get the header row
                 rows = list(reader)  # Get all data rows
@@ -231,7 +249,9 @@ def generate_annotation_files(
             if "page_id" in headers:
                 print(f"Using 'page_id' column at position {headers.index('page_id')}")
             elif "image_id" in headers:
-                print(f"Using 'image_id' column at position {headers.index('image_id')}")
+                print(
+                    f"Using 'image_id' column at position {headers.index('image_id')}"
+                )
             else:
                 print("Neither 'page_id' nor 'image_id' found in headers!")
 
@@ -257,7 +277,9 @@ def generate_annotation_files(
             if "page_id" in headers:
                 print(f"Using 'page_id' column at position {headers.index('page_id')}")
             elif "image_id" in headers:
-                print(f"Using 'image_id' column at position {headers.index('image_id')}")
+                print(
+                    f"Using 'image_id' column at position {headers.index('image_id')}"
+                )
             else:
                 print("Neither 'page_id' nor 'image_id' found in headers!")
 
@@ -271,7 +293,9 @@ def generate_annotation_files(
             print("===== END DEBUG INFO =====\n")
 
             # Print result for the first failure but don't exit
-            print(f"RESULT: No data rows found for '{page_id}' in '{headers[page_id_column]}' column")
+            print(
+                f"RESULT: No data rows found for '{page_id}' in '{headers[page_id_column]}' column"
+            )
             print("Continuing processing remaining files...")
         elif not image_rows:
             # Just add to missing files without debug output for subsequent failures
@@ -286,10 +310,10 @@ def generate_annotation_files(
 
         # Create the annotation file
         label_file = f"{case_id}_{page_id}.csv"
-        annotation_file = os.path.join(labels_dir, label_file)
+        annotation_file = str(Path(labels_dir) / label_file)
 
         try:
-            with open(annotation_file, "w", newline="") as csvfile:
+            with Path(annotation_file).open("w", newline="") as csvfile:
                 writer = csv.writer(csvfile)
                 writer.writerow(headers_with_label)
 
@@ -300,7 +324,9 @@ def generate_annotation_files(
             print(f"Created annotation file: {annotation_file}")
             successful_files.append((case_id, page_id, image_file, label_file))
         except Exception as e:
-            missing_files.append((case_id, page_id, f"Error writing annotation file: {str(e)}"))
+            missing_files.append(
+                (case_id, page_id, f"Error writing annotation file: {str(e)}")
+            )
 
     # Report on missing files
     if missing_files:
@@ -324,18 +350,18 @@ def create_master_file(
     Args:
         successful_files: List of (case_id, page_id, image_file, label_file) tuples
         master_file: Path where the master file will be saved
-        network_share: Network share path where files will be copied (e.g., \\server\share)
+        network_share: Network share path where files will be copied (e.g., \\\\server\\share)
         annotators: List of annotator names (default: ["annotator1", "annotator2"])
     """
     if annotators is None or len(annotators) < 2:
         annotators = ["annotator1", "annotator2"]
 
     # Create the output directory if it doesn't exist
-    os.makedirs(os.path.dirname(os.path.abspath(master_file)), exist_ok=True)
+    Path(master_file).parent.resolve().mkdir(parents=True, exist_ok=True)
 
     # Prepare the CSV data
     csv_data = []
-    for case_id, page_id, image_file, label_file in successful_files:
+    for case_id, page_id, _image_file, _label_file in successful_files:
         # Standard network share paths - store just the paths without hyperlink formatting
         image_path = f"{network_share}\\annotation_images\\{case_id}_{page_id}.jpeg"
         label_path = f"{network_share}\\annotation_labels\\{case_id}_{page_id}.csv"
@@ -409,7 +435,7 @@ def create_master_file(
         )
 
     # Write the CSV file manually to avoid automatic escaping
-    with open(master_file, "w", newline="") as f:
+    with Path(master_file).open("w", newline="") as f:
         # Write header
         f.write(",".join(fieldnames) + "\n")
 
@@ -430,7 +456,7 @@ def create_master_file(
             f.write(",".join(normal_fields) + "\n")
 
     # Also create an Excel file if xlsxwriter is available
-    excel_file = os.path.splitext(master_file)[0] + ".xlsx"
+    excel_file = str(Path(master_file).with_suffix(".xlsx"))
     if HAVE_XLSXWRITER:
         try:
             # Create the Excel file with proper hyperlinks
@@ -453,10 +479,16 @@ def create_master_file(
 
                 # Write hyperlinks
                 worksheet.write_formula(
-                    row_idx, 2, f'HYPERLINK("{row_data["image_path"]}","View image")', link_format
+                    row_idx,
+                    2,
+                    f'HYPERLINK("{row_data["image_path"]}","View image")',
+                    link_format,
                 )
                 worksheet.write_formula(
-                    row_idx, 3, f'HYPERLINK("{row_data["label_path"]}","View labels")', link_format
+                    row_idx,
+                    3,
+                    f'HYPERLINK("{row_data["label_path"]}","View labels")',
+                    link_format,
                 )
 
                 # Write remaining cells
@@ -479,7 +511,9 @@ def create_master_file(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Prepare annotation files and tracking data")
+    parser = argparse.ArgumentParser(
+        description="Prepare annotation files and tracking data"
+    )
     parser.add_argument(
         "--cases-dir",
         default="du_cases",
@@ -534,7 +568,7 @@ def main() -> None:
     args = parser.parse_args()
 
     # Make sure the cases directory exists
-    if not os.path.isdir(args.cases_dir):
+    if not Path(args.cases_dir).is_dir():
         print(f"Error: Cases directory not found: {args.cases_dir}")
         sys.exit(1)
 
@@ -551,10 +585,14 @@ def main() -> None:
         copied_images = copy_image_files(args.cases_dir, args.images_dir, images, args)
 
     # Step 3: Generate annotation files
-    successful_files = generate_annotation_files(args.cases_dir, args.labels_dir, images, args)
+    successful_files = generate_annotation_files(
+        args.cases_dir, args.labels_dir, images, args
+    )
 
     # Step 4: Create master tracking file
-    create_master_file(successful_files, args.master_file, args.network_share, args.annotators)
+    create_master_file(
+        successful_files, args.master_file, args.network_share, args.annotators
+    )
 
     print("\nAnnotation preparation complete!")
     if not args.no_copy_images:
@@ -562,7 +600,7 @@ def main() -> None:
     print(f"- Generated {len(successful_files)} annotation files in {args.labels_dir}")
     print(f"- Created master tracking file: {args.master_file}")
     if HAVE_XLSXWRITER:
-        excel_file = os.path.splitext(args.master_file)[0] + ".xlsx"
+        excel_file = str(Path(args.master_file).with_suffix(".xlsx"))
         print(f"  Also created Excel file: {excel_file}")
     print(f"- Images path in master file: {args.network_share}\\annotation_images\\")
     print(f"- Labels path in master file: {args.network_share}\\annotation_labels\\")

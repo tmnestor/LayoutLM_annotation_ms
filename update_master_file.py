@@ -15,7 +15,7 @@ import argparse
 import csv
 import os
 import sys
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 def load_master_file(master_file: str) -> Tuple[List[Dict[str, str]], List[str]]:

@@ -11,11 +11,11 @@ This script analyzes the master CSV file and generates reports including:
 
 import argparse
 import csv
-import os
 import sys
-from collections import Counter, defaultdict
+from collections import defaultdict
 from datetime import datetime
-from typing import Dict, List, Tuple
+from pathlib import Path
+from typing import Dict, List
 
 
 def load_master_file(master_file: str) -> List[Dict[str, str]]:
@@ -28,12 +28,12 @@ def load_master_file(master_file: str) -> List[Dict[str, str]]:
     Returns:
         List of row dictionaries from the master file
     """
-    if not os.path.exists(master_file):
+    if not Path(master_file).exists():
         print(f"Error: Master file not found: {master_file}")
         sys.exit(1)
         
     rows = []
-    with open(master_file, 'r', newline='') as csvfile:
+    with Path(master_file).open('r', newline='') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             rows.append(row)
@@ -68,7 +68,7 @@ def generate_progress_report(rows: List[Dict[str, str]], output_file: str) -> No
             cases[case_id]['completed_both'] += 1
     
     # Generate the report
-    with open(output_file, 'w') as f:
+    with Path(output_file).open('w') as f:
         f.write("# Annotation Progress Report\n")
         f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         
@@ -128,7 +128,7 @@ def generate_annotator_report(rows: List[Dict[str, str]], output_file: str) -> N
             stats[annotator]['completed'] += 1
     
     # Generate the report
-    with open(output_file, 'w') as f:
+    with Path(output_file).open('w') as f:
         f.write("# Annotator Productivity Report\n")
         f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
         
@@ -153,14 +153,14 @@ def generate_all_reports(master_file: str, output_dir: str) -> None:
         output_dir: Directory where reports will be saved
     """
     # Create the output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
     
     # Load the master file
     rows = load_master_file(master_file)
     
     # Generate reports
-    generate_progress_report(rows, os.path.join(output_dir, "progress_report.md"))
-    generate_annotator_report(rows, os.path.join(output_dir, "annotator_report.md"))
+    generate_progress_report(rows, str(Path(output_dir) / "progress_report.md"))
+    generate_annotator_report(rows, str(Path(output_dir) / "annotator_report.md"))
     
     print(f"All reports generated in: {output_dir}")
 
@@ -171,12 +171,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--master-file",
-        default=os.path.expanduser("~/Desktop/annotation_master.csv"),
+        default=str(Path.home() / "Desktop" / "annotation_master.csv"),
         help="Path to the master CSV file (default: ~/Desktop/annotation_master.csv)",
     )
     parser.add_argument(
         "--output-dir",
-        default=os.path.expanduser("~/Desktop/annotation_reports"),
+        default=str(Path.home() / "Desktop" / "annotation_reports"),
         help="Directory where reports will be saved (default: ~/Desktop/annotation_reports)",
     )
     parser.add_argument(
@@ -189,22 +189,22 @@ def main() -> None:
     args = parser.parse_args()
     
     # Verify that the master file exists
-    if not os.path.exists(args.master_file):
+    if not Path(args.master_file).exists():
         print(f"Error: Master file not found: {args.master_file}")
         sys.exit(1)
     
     # Create the output directory if it doesn't exist
-    os.makedirs(args.output_dir, exist_ok=True)
+    Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     
     # Load the master file
     rows = load_master_file(args.master_file)
     
     # Generate the requested report(s)
     if args.report_type == "all" or args.report_type == "progress":
-        generate_progress_report(rows, os.path.join(args.output_dir, "progress_report.md"))
+        generate_progress_report(rows, str(Path(args.output_dir) / "progress_report.md"))
         
     if args.report_type == "all" or args.report_type == "annotator":
-        generate_annotator_report(rows, os.path.join(args.output_dir, "annotator_report.md"))
+        generate_annotator_report(rows, str(Path(args.output_dir) / "annotator_report.md"))
     
 
 if __name__ == "__main__":
