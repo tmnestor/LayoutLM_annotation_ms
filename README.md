@@ -184,53 +184,17 @@ When images and labels will be accessed from a different system than where you p
    - Edit `data/annotation_images.csv` with the images to annotate
    - Run prepare_annotations.py with the network share option and copy-images option:
    
-     **For Windows mapped drives (recommended for Excel compatibility):**
      ```bash
      # Using full path - recommended for specific subfolders
      ./prepare_annotations.py --network-share "Z:Document Understanding\information_extraction\gold\doc filter\2025 gold eval set"
-     
-     # Or using just the drive letter for root directory
-     ./prepare_annotations.py --network-share Z:
+   
      ```
      
      This approach uses a mapped network drive (Z:) instead of a UNC path, which often works better with Excel hyperlinks.
      The Excel HYPERLINK formulas will have paths like: `Z:Document Understanding\information_extraction\gold\doc filter\2025 gold eval set\annotation_images\...`
      
-     **For Windows network share with UNC path:**
-     ```bash
-     ./prepare_annotations.py --network-share "\\\\server\\share"
      ```
      
-     This automatically enables Windows path format in the master file and copies images.
-     
-     **Note:** Double backslashes are needed in the paths to escape them properly.
-     The Excel HYPERLINK formulas will have paths like: `\\server\share\annotation_images\...`
-     
-     **Alternative UNC path format:**
-     ```bash
-     ./prepare_annotations.py --network-share "//server/share"
-     ```
-     
-     **Custom image and CSV file locations:**
-     
-     If your files are in non-standard locations, you can use templates to specify where to find them:
-     
-     ```bash
-     ./prepare_annotations.py --network-share "\\\\server\\share" \
-       --csv-path-template "/data/form_results/{case_id}/analysis/{page_id}_form.csv" \
-       --image-path-template "/archives/scans/{case_id}/pages/{page_id}.jpeg"
-     ```
-     
-     The templates support these variables:
-     - `{case_dir}`: The full path to the case directory
-     - `{case_id}`: The case ID
-     - `{page_id}`: The page ID
-     - `{image_file}`: The image filename including extension (for image template only)
-   
-   - This generates:
-     - Local annotation files in your local `annotation_labels/` directory
-     - Image files copied to your local `annotation_images/` directory
-     - A master file with hyperlinks pointing to the Windows network paths
 
 2. **Copy files to network location**
    - Copy/move your local `annotation_images` directory to the Windows share
@@ -239,19 +203,7 @@ When images and labels will be accessed from a different system than where you p
    **Using Windows Explorer:**
    - Map the network drive or access it via `\\server\share\`
    - Copy the files using Windows Explorer
-   
-   **Using command line (if applicable):**
-   - For Windows Command Prompt:
-     ```cmd
-     xcopy annotation_images \\server\share\annotation_images /E /I /Y
-     xcopy annotation_labels \\server\share\annotation_labels /E /I /Y
-     ```
-   - For PowerShell:
-     ```powershell
-     Copy-Item -Path "annotation_images" -Destination "\\server\share\annotation_images" -Recurse -Force
-     Copy-Item -Path "annotation_labels" -Destination "\\server\share\annotation_labels" -Recurse -Force
-     ```
-
+ 
 3. **Distribute master file to annotators**
    - Share the master.csv file with annotators
    - The hyperlinks will correctly point to the Windows network share paths
@@ -270,14 +222,8 @@ Create annotation files for the specified images and generate a master tracking 
 ./prepare_annotations.py
 
 # Standard network share option (recommended)
-./prepare_annotations.py --network-share "\\\\server\\share"
+./prepare_annotations.py --network-share "Z:Document Understanding\information_extraction\gold\doc filter\2025 gold eval set"
 
-# For Unix/Linux paths in the master file (with network share)
-./prepare_annotations.py --network-share "//server/share"
-
-# With custom CSV and image paths
-./prepare_annotations.py --csv-path-template "{case_dir}/custom/path/{case_id}_data.csv" \
-                       --image-path-template "{case_dir}/documents/{page_id}.jpeg"
 ```
 
 **Important Notes**:
