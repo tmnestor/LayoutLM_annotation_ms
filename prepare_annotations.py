@@ -491,17 +491,108 @@ def create_master_file(
     if write_excel_file(excel_file, hyperlink_data):
         print(f"Created master Excel file: {excel_file}")
     
-    # Create individual files for each case_id if requested
+    # Create individual files for each case_id and annotator if requested
     if split_by_case:
         case_files_created = 0
+        
+        # Create a directory structure for each annotator
+        for annotator in annotators:
+            annotator_dir = cases_dir / annotator
+            annotator_dir.mkdir(exist_ok=True)
+        
+        # For each case, create separate files for each annotator
         for case_id, data in case_data.items():
-            case_file = str(cases_dir / f"{case_id}.xlsx")
-            if write_excel_file(case_file, data, sheet_name=f"Case {case_id}", include_case_id=False):
-                case_files_created += 1
+            for annotator_idx, annotator in enumerate(annotators):
+                # Filter data for this annotator
+                annotator_data = []
+                for row in data:
+                    # Create a copy of the row with only relevant annotator info
+                    annotator_row = row.copy()
+                    
+                    # Keep only the current annotator's columns
+                    if annotator_idx == 0:  # First annotator
+                        annotator_row["assignee"] = annotator_row["assignee1"]
+                        annotator_row["has_completed"] = annotator_row["has_assignee1_completed"]
+                    else:  # Second annotator
+                        annotator_row["assignee"] = annotator_row["assignee2"]
+                        annotator_row["has_completed"] = annotator_row["has_assignee2_completed"]
+                    
+                    # Remove the other annotator's columns
+                    if "assignee1" in annotator_row:
+                        del annotator_row["assignee1"]
+                    if "has_assignee1_completed" in annotator_row:
+                        del annotator_row["has_assignee1_completed"]
+                    if "assignee2" in annotator_row:
+                        del annotator_row["assignee2"]
+                    if "has_assignee2_completed" in annotator_row:
+                        del annotator_row["has_assignee2_completed"]
+                    
+                    annotator_data.append(annotator_row)
+                
+                # Create a file for this case and annotator
+                case_file = str(cases_dir / annotator / f"{case_id}.xlsx")
+                
+                # Define the fieldnames specifically for annotator-specific files
+                annotator_fieldnames = [
+                    "page_id",
+                    "image_file_path",
+                    "label_file_path",
+                    "assignee",
+                    "has_completed",
+                    "notes"
+                ]
+                
+                try:
+                    workbook = xlsxwriter.Workbook(case_file)
+                    worksheet = workbook.add_worksheet(f"Case {case_id}")
+                    
+                    # Create formats
+                    header_format = workbook.add_format({"bold": True})
+                    link_format = workbook.add_format({"font_color": "blue", "underline": 1})
+                    
+                    # Write header row
+                    for col, field in enumerate(annotator_fieldnames):
+                        worksheet.write(0, col, field, header_format)
+                    
+                    # Write data rows
+                    for row_idx, row_data in enumerate(annotator_data, start=1):
+                        # Write page_id
+                        worksheet.write(row_idx, 0, row_data["page_id"])
+                        
+                        # Write hyperlinks
+                        worksheet.write_formula(
+                            row_idx,
+                            1,
+                            f'HYPERLINK("{row_data["image_path"]}","View image")',
+                            link_format,
+                        )
+                        worksheet.write_formula(
+                            row_idx,
+                            2,
+                            f'HYPERLINK("{row_data["label_path"]}","View labels")',
+                            link_format,
+                        )
+                        
+                        # Write remaining cells
+                        worksheet.write(row_idx, 3, row_data["assignee"])
+                        worksheet.write(row_idx, 4, row_data["has_completed"])
+                        worksheet.write(row_idx, 5, row_data["notes"])
+                    
+                    # Set column widths for better readability
+                    worksheet.set_column(0, 0, 15)  # page_id
+                    worksheet.set_column(1, 2, 20)  # hyperlinks
+                    worksheet.set_column(3, 3, 15)  # assignee
+                    worksheet.set_column(4, 4, 15)  # has_completed
+                    worksheet.set_column(5, 5, 25)  # notes
+                    
+                    workbook.close()
+                    case_files_created += 1
+                except Exception as e:
+                    print(f"Error: Failed to create case file {case_file}: {str(e)}")
         
-        print(f"Created {case_files_created} case-specific Excel files in {cases_dir}/")
+        print(f"Created {case_files_created} annotator-specific case files in {cases_dir}/")
         
-        # Create an index file listing all cases with links to their specific files
+        # Create an index file listing all cases with links to annotator-specific files
         index_file = str(cases_dir / "index.xlsx")
         try:
             workbook = xlsxwriter.Workbook(index_file)
@@ -514,26 +605,30 @@ def create_master_file(
             # Write header
             worksheet.write(0, 0, "case_id", header_format)
             worksheet.write(0, 1, "num_images", header_format)
-            worksheet.write(0, 2, "case_file", header_format)
+            
+            # Add columns for each annotator
+            for idx, annotator in enumerate(annotators):
+                worksheet.write(0, 2 + idx, f"{annotator}", header_format)
             
             # Write data rows
             for row_idx, (case_id, data) in enumerate(sorted(case_data.items()), start=1):
                 worksheet.write(row_idx, 0, case_id)
                 worksheet.write(row_idx, 1, len(data))
                 
-                # Create a relative path hyperlink to the case file
-                case_file_name = f"{case_id}.xlsx"
-                worksheet.write_formula(
-                    row_idx, 
-                    2, 
-                    f'HYPERLINK("{case_file_name}","View case file")',
-                    link_format
-                )
+                # Create hyperlinks to annotator-specific case files
+                for idx, annotator in enumerate(annotators):
+                    case_file_path = f"{annotator}/{case_id}.xlsx"
+                    worksheet.write_formula(
+                        row_idx, 
+                        2 + idx, 
+                        f'HYPERLINK("{case_file_path}","{annotator} file")',
+                        link_format
+                    )
             
             # Set column widths
             worksheet.set_column(0, 0, 15)  # case_id
             worksheet.set_column(1, 1, 10)  # num_images
-            worksheet.set_column(2, 2, 20)  # case_file
+            worksheet.set_column(2, 2 + len(annotators) - 1, 15)  # annotator columns
             
             workbook.close()
             print(f"Created case index file: {index_file}")

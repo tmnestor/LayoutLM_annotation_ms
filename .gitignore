@@ -37,3 +37,12 @@ logs/
 .vscode/
 *.sublime-project
 *.sublime-workspace
+
+# Data files
+*.csv
+*.xlsx
+*.xls
+data/cases/
+annotation_images/
+annotation_labels/
+du_cases/

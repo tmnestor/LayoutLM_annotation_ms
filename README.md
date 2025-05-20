@@ -23,11 +23,16 @@ The system works with the existing DU-SSD directory structure where:
 ├── data/                   # Configuration and template files
 │   ├── annotation_images.csv  # List of images to annotate
 │   ├── master.xlsx         # Master tracking file in Excel format
-│   ├── cases/              # Individual case files
-│   │   ├── 1-12ABCDEF.xlsx # One Excel file per case
-│   │   ├── 1-15XYZWQP.xlsx
-│   │   ├── ...
-│   │   └── index.xlsx      # Index of all cases with links
+│   ├── cases/              # Annotator-specific case files
+│   │   ├── annotator1/     # First annotator's files
+│   │   │   ├── 1-12ABCDEF.xlsx 
+│   │   │   ├── 1-15XYZWQP.xlsx
+│   │   │   └── ...
+│   │   ├── annotator2/     # Second annotator's files
+│   │   │   ├── 1-12ABCDEF.xlsx
+│   │   │   ├── 1-15XYZWQP.xlsx
+│   │   │   └── ...
+│   │   └── index.xlsx      # Index of all cases with links to annotator files
 │   └── completion_updates.csv # Template for batch updates
 ├── du_cases/               # Main case directory structure
 │   ├── 1-12ABCDEF/         # Example case directory
@@ -87,8 +92,16 @@ An Excel workbook containing the following columns:
 - has_assignee2_completed
 - notes
 
-### data/cases/*.xlsx
-Individual Excel files for each case, containing the same columns as the master file except for case_id (which is already in the filename). This makes it easier to distribute specific cases to annotators.
+### data/cases/annotator*/*.xlsx
+Annotator-specific Excel files for each case, containing only the columns relevant to a single annotator:
+- page_id
+- image_file_path (as clickable hyperlinks)
+- label_file_path (as clickable hyperlinks)
+- assignee (the annotator's name)
+- has_completed (completion status for this annotator)
+- notes
+
+Each annotator has their own directory containing case files, preventing annotators from overwriting each other's work. This organization makes it easier to distribute specific cases to specific annotators.
 
 ## Workflow
 
@@ -125,9 +138,10 @@ This single script will:
 1. Read the list of images from `data/annotation_images.csv`
 2. Generate annotation files only for those images in the `annotation_labels/` directory
 3. Create a master tracking file in `data/master.xlsx` with clickable hyperlinks
-4. Create individual Excel files for each case in `data/cases/` directory
-5. Create an index file (`data/cases/index.xlsx`) with links to individual case files
-6. Provide a summary of how many images were processed
+4. Create separate annotator directories in `data/cases/` for each annotator
+5. Generate annotator-specific Excel files for each case in the annotator's directory
+6. Create an index file (`data/cases/index.xlsx`) with links to all annotator-specific case files
+7. Provide a summary of how many images were processed
 
 ## Scripts
 
