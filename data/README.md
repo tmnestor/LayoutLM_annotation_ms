@@ -8,6 +8,28 @@ This directory contains configuration and template files for the document annota
 - **completion_updates.csv**: Template for batch-updating annotation status in the master file
 - **master.csv**: Master file tracking annotation assignments and completion status
 
+## Directory Structure
+
+```
+/
+├── data/                   # Configuration and template files
+│   ├── annotation_images.csv  # List of images to annotate
+│   ├── master.csv          # Master tracking file
+│   └── completion_updates.csv # Template for batch updates
+├── du_cases/               # Main case directory structure
+│   ├── case1/
+│   │   ├── images/
+│   │   │   ├── 9876543210_01_0.jpeg
+│   │   │   └── ...
+│   │   └── processing/
+│   │       └── form-recogniser/
+│   │           └── df_check.csv
+│   └── ...
+├── annotation_images/      # Image files for annotation
+├── annotation_labels/      # Generated annotation files
+└── reports/                # Generated reports
+```
+
 ## File Formats
 
 ### annotation_images.csv

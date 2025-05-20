@@ -343,44 +343,63 @@ def create_master_file(
     master_file: str,
     network_share: str,
     annotators: List[str] = None,
+    split_by_case: bool = True,
 ) -> None:
     """
-    Create a master tracking file for the annotation process.
+    Create master tracking files for the annotation process as Excel XLSX files.
+    Generates both a combined master file and individual files per case_id.
 
     Args:
         successful_files: List of (case_id, page_id, image_file, label_file) tuples
-        master_file: Path where the master file will be saved
-        network_share: Network share path where files will be copied (e.g., \\\\server\\share)
+        master_file: Path where the master file will be saved (will be modified to .xlsx)
+        network_share: Network share path where files will be copied (e.g., Z:)
         annotators: List of annotator names (default: ["annotator1", "annotator2"])
+        split_by_case: Whether to create separate files for each case_id
     """
     if annotators is None or len(annotators) < 2:
         annotators = ["annotator1", "annotator2"]
 
     # Create the output directory if it doesn't exist
-    Path(master_file).parent.resolve().mkdir(parents=True, exist_ok=True)
+    master_dir = Path(master_file).parent.resolve()
+    master_dir.mkdir(parents=True, exist_ok=True)
+    cases_dir = master_dir / "cases"
+    if split_by_case:
+        cases_dir.mkdir(exist_ok=True)
 
-    # Prepare the CSV data
-    csv_data = []
+    # Convert master_file path to .xlsx extension
+    excel_file = str(Path(master_file).with_suffix(".xlsx"))
+
+    # Prepare the data and organize by case_id
+    hyperlink_data = []  # Store data for XLSX generation
+    case_data = {}  # Data organized by case_id for per-case files
+    
     for case_id, page_id, _image_file, _label_file in successful_files:
-        # Standard network share paths - store just the paths without hyperlink formatting
+        # Create properly formatted hyperlinks for Excel
         image_path = f"{network_share}\\annotation_images\\{case_id}_{page_id}.jpeg"
         label_path = f"{network_share}\\annotation_labels\\{case_id}_{page_id}.csv"
 
-        # Create a row for the master CSV with the paths only - hyperlink formatting will be done at write time
-        row = {
+        # Create the row data
+        row_data = {
             "case_id": case_id,
             "page_id": page_id,
-            "image_file_path": image_path,
-            "label_file_path": label_path,
+            "image_path": image_path,
+            "label_path": label_path,
             "assignee1": annotators[0],
             "has_assignee1_completed": "no",
             "assignee2": annotators[1],
             "has_assignee2_completed": "no",
             "notes": "",
         }
-        csv_data.append(row)
+        
+        # Add to the main data list
+        hyperlink_data.append(row_data)
+        
+        # Organize by case_id for per-case files
+        if case_id not in case_data:
+            case_data[case_id] = []
+        case_data[case_id].append(row_data)
 
-    # Define the fieldnames for the CSV file
+    # Define the fieldnames for the Excel file
     fieldnames = [
         "case_id",
         "page_id",
@@ -393,121 +412,133 @@ def create_master_file(
         "notes",
     ]
 
-    # Format the data for CSV output with proper hyperlinks for Excel
-    formatted_rows = []
-    hyperlink_data = []  # Store data for XLSX generation
-
-    for row in csv_data:
-        current_case_id = row["case_id"]
-        current_page_id = row["page_id"]
-
-        # Create properly formatted hyperlinks for Excel
-        image_path = f"Z:Document Understanding\\information_extraction\\gold\\doc filter\\2025 gold eval set\\annotation_images\\{current_case_id}_{current_page_id}.jpeg"
-        label_path = f"Z:Document Understanding\\information_extraction\\gold\\doc filter\\2025 gold eval set\\annotation_labels\\{current_case_id}_{current_page_id}.csv"
-
-        # Store the formatted row for CSV
-        formatted_row = {
-            "case_id": row["case_id"],
-            "page_id": row["page_id"],
-            "image_file_path": f'=HYPERLINK("{image_path}","View image")',
-            "label_file_path": f'=HYPERLINK("{label_path}","View labels")',
-            "assignee1": row["assignee1"],
-            "has_assignee1_completed": row["has_assignee1_completed"],
-            "assignee2": row["assignee2"],
-            "has_assignee2_completed": row["has_assignee2_completed"],
-            "notes": row["notes"],
-        }
-        formatted_rows.append(formatted_row)
-
-        # Store the raw data for XLSX creation
-        hyperlink_data.append(
-            {
-                "case_id": current_case_id,
-                "page_id": current_page_id,
-                "image_path": image_path,
-                "label_path": label_path,
-                "assignee1": row["assignee1"],
-                "has_assignee1_completed": row["has_assignee1_completed"],
-                "assignee2": row["assignee2"],
-                "has_assignee2_completed": row["has_assignee2_completed"],
-                "notes": row["notes"],
-            }
+    # Check for xlsxwriter availability
+    if not HAVE_XLSXWRITER:
+        print(
+            "Error: XlsxWriter package not available. Install it with 'pip install xlsxwriter' to create Excel files."
         )
-
-    # Write the CSV file manually to avoid automatic escaping
-    with Path(master_file).open("w", newline="") as f:
-        # Write header
-        f.write(",".join(fieldnames) + "\n")
-
-        # Write each row manually with exact formatting
-        for row in formatted_rows:
-            # For non-hyperlink fields
-            normal_fields = [
-                row["case_id"],
-                row["page_id"],
-                f'"{row["image_file_path"]}"',  # Quoted hyperlink
-                f'"{row["label_file_path"]}"',  # Quoted hyperlink
-                row["assignee1"],
-                row["has_assignee1_completed"],
-                row["assignee2"],
-                row["has_assignee2_completed"],
-                row["notes"],
-            ]
-            f.write(",".join(normal_fields) + "\n")
-
-    # Also create an Excel file if xlsxwriter is available
-    excel_file = str(Path(master_file).with_suffix(".xlsx"))
-    if HAVE_XLSXWRITER:
+        sys.exit(1)
+    
+    # Helper function to write an Excel file with the given data
+    def write_excel_file(file_path, data, sheet_name="Annotation Master", include_case_id=True):
         try:
-            # Create the Excel file with proper hyperlinks
-            workbook = xlsxwriter.Workbook(excel_file)
-            worksheet = workbook.add_worksheet("Annotation Master")
+            workbook = xlsxwriter.Workbook(file_path)
+            worksheet = workbook.add_worksheet(sheet_name)
 
             # Create formats
             header_format = workbook.add_format({"bold": True})
             link_format = workbook.add_format({"font_color": "blue", "underline": 1})
 
-            # Write header row
-            for col, field in enumerate(fieldnames):
+            # Write header row - for case-specific files, we may skip the case_id column
+            header_cols = fieldnames if include_case_id else [f for f in fieldnames if f != "case_id"]
+            for col, field in enumerate(header_cols):
                 worksheet.write(0, col, field, header_format)
 
             # Write data rows
-            for row_idx, row_data in enumerate(hyperlink_data, start=1):
-                # Write regular cells
-                worksheet.write(row_idx, 0, row_data["case_id"])
-                worksheet.write(row_idx, 1, row_data["page_id"])
+            for row_idx, row_data in enumerate(data, start=1):
+                col_offset = 0
+                
+                # Skip case_id column for case-specific files if requested
+                if include_case_id:
+                    worksheet.write(row_idx, 0, row_data["case_id"])
+                else:
+                    col_offset = -1  # Shift all columns one to the left
+                
+                # Write page_id
+                worksheet.write(row_idx, 1 + col_offset, row_data["page_id"])
 
                 # Write hyperlinks
                 worksheet.write_formula(
                     row_idx,
-                    2,
+                    2 + col_offset,
                     f'HYPERLINK("{row_data["image_path"]}","View image")',
                     link_format,
                 )
                 worksheet.write_formula(
                     row_idx,
-                    3,
+                    3 + col_offset,
                     f'HYPERLINK("{row_data["label_path"]}","View labels")',
                     link_format,
                 )
 
                 # Write remaining cells
-                worksheet.write(row_idx, 4, row_data["assignee1"])
-                worksheet.write(row_idx, 5, row_data["has_assignee1_completed"])
-                worksheet.write(row_idx, 6, row_data["assignee2"])
-                worksheet.write(row_idx, 7, row_data["has_assignee2_completed"])
-                worksheet.write(row_idx, 8, row_data["notes"])
+                worksheet.write(row_idx, 4 + col_offset, row_data["assignee1"])
+                worksheet.write(row_idx, 5 + col_offset, row_data["has_assignee1_completed"])
+                worksheet.write(row_idx, 6 + col_offset, row_data["assignee2"])
+                worksheet.write(row_idx, 7 + col_offset, row_data["has_assignee2_completed"])
+                worksheet.write(row_idx, 8 + col_offset, row_data["notes"])
+
+            # Set column widths for better readability
+            if include_case_id:
+                worksheet.set_column(0, 0, 15)  # case_id
+                worksheet.set_column(1, 1, 15)  # page_id
+                worksheet.set_column(2, 3, 20)  # hyperlinks
+                worksheet.set_column(4, 7, 15)  # assignees and status
+                worksheet.set_column(8, 8, 25)  # notes
+            else:
+                worksheet.set_column(0, 0, 15)  # page_id
+                worksheet.set_column(1, 2, 20)  # hyperlinks
+                worksheet.set_column(3, 6, 15)  # assignees and status
+                worksheet.set_column(7, 7, 25)  # notes
 
             workbook.close()
-            print(f"Created master XLSX file: {excel_file}")
+            return True
         except Exception as e:
-            print(f"Warning: Failed to create Excel file: {str(e)}")
-    else:
-        print(
-            "Note: XlsxWriter package not available. Install it with 'pip install xlsxwriter' to create Excel files."
-        )
+            print(f"Error: Failed to create Excel file {file_path}: {str(e)}")
+            return False
 
-    print(f"Created master CSV file: {master_file}")
+    # Create the main master file with all cases
+    if write_excel_file(excel_file, hyperlink_data):
+        print(f"Created master Excel file: {excel_file}")
+    
+    # Create individual files for each case_id if requested
+    if split_by_case:
+        case_files_created = 0
+        for case_id, data in case_data.items():
+            case_file = str(cases_dir / f"{case_id}.xlsx")
+            if write_excel_file(case_file, data, sheet_name=f"Case {case_id}", include_case_id=False):
+                case_files_created += 1
+        
+        print(f"Created {case_files_created} case-specific Excel files in {cases_dir}/")
+        
+        # Create an index file listing all cases with links to their specific files
+        index_file = str(cases_dir / "index.xlsx")
+        try:
+            workbook = xlsxwriter.Workbook(index_file)
+            worksheet = workbook.add_worksheet("Case Index")
+            
+            # Create formats
+            header_format = workbook.add_format({"bold": True})
+            link_format = workbook.add_format({"font_color": "blue", "underline": 1})
+            
+            # Write header
+            worksheet.write(0, 0, "case_id", header_format)
+            worksheet.write(0, 1, "num_images", header_format)
+            worksheet.write(0, 2, "case_file", header_format)
+            
+            # Write data rows
+            for row_idx, (case_id, data) in enumerate(sorted(case_data.items()), start=1):
+                worksheet.write(row_idx, 0, case_id)
+                worksheet.write(row_idx, 1, len(data))
+                
+                # Create a relative path hyperlink to the case file
+                case_file_name = f"{case_id}.xlsx"
+                worksheet.write_formula(
+                    row_idx, 
+                    2, 
+                    f'HYPERLINK("{case_file_name}","View case file")',
+                    link_format
+                )
+            
+            # Set column widths
+            worksheet.set_column(0, 0, 15)  # case_id
+            worksheet.set_column(1, 1, 10)  # num_images
+            worksheet.set_column(2, 2, 20)  # case_file
+            
+            workbook.close()
+            print(f"Created case index file: {index_file}")
+        except Exception as e:
+            print(f"Error: Failed to create case index file: {str(e)}")
 
 
 def main() -> None:
@@ -536,8 +567,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--master-file",
-        default="data/master.csv",
-        help="Path for the master tracking file (default: data/master.csv)",
+        default="data/master.xlsx",
+        help="Path for the master tracking Excel file (default: data/master.xlsx)",
     )
     parser.add_argument(
         "--network-share",
@@ -565,6 +596,16 @@ def main() -> None:
         default=["annotator1", "annotator2"],
         help="List of annotator names (default: annotator1 annotator2)",
     )
+    parser.add_argument(
+        "--split-by-case",
+        action="store_true",
+        help="Split the master file into separate Excel files for each case_id",
+    )
+    parser.add_argument(
+        "--no-split-by-case",
+        action="store_true",
+        help="Do not split the master file by case_id",
+    )
     args = parser.parse_args()
 
     # Make sure the cases directory exists
@@ -590,8 +631,15 @@ def main() -> None:
     )
 
     # Step 4: Create master tracking file
+    # Determine whether to split by case
+    split_by_case = True  # Default to True
+    if args.no_split_by_case:
+        split_by_case = False
+    elif args.split_by_case:
+        split_by_case = True
+        
     create_master_file(
-        successful_files, args.master_file, args.network_share, args.annotators
+        successful_files, args.master_file, args.network_share, args.annotators, split_by_case
     )
 
     print("\nAnnotation preparation complete!")
@@ -599,9 +647,10 @@ def main() -> None:
         print(f"- Copied {len(copied_images)} image files to {args.images_dir}")
     print(f"- Generated {len(successful_files)} annotation files in {args.labels_dir}")
     print(f"- Created master tracking file: {args.master_file}")
-    if HAVE_XLSXWRITER:
-        excel_file = str(Path(args.master_file).with_suffix(".xlsx"))
-        print(f"  Also created Excel file: {excel_file}")
+    if split_by_case:
+        cases_dir = Path(args.master_file).parent / "cases"
+        print(f"- Created case-specific files in: {cases_dir}/")
+        print(f"- Created case index file: {cases_dir}/index.xlsx")
     print(f"- Images path in master file: {args.network_share}\\annotation_images\\")
     print(f"- Labels path in master file: {args.network_share}\\annotation_labels\\")
 
