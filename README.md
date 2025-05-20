@@ -109,8 +109,9 @@ To prepare annotation files for a specific list of images:
 This single script will:
 1. Read the list of images from `data/annotation_images.csv`
 2. Generate annotation files only for those images in the `annotation_labels/` directory
-3. Create a master tracking file in `data/master.csv`
-4. Provide a summary of how many images were processed
+3. Create a master tracking file in `data/master.csv` with Excel hyperlinks
+4. If XlsxWriter is available, also create a master tracking file in Excel format (`data/master.xlsx`)
+5. Provide a summary of how many images were processed
 
 ## Example Use Cases
 

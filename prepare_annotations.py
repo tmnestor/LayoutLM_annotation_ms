@@ -17,6 +17,13 @@ import shutil
 import sys
 from typing import List, Tuple
 
+# Try to import xlsxwriter but don't fail if it's not available
+try:
+    import xlsxwriter
+    HAVE_XLSXWRITER = True
+except ImportError:
+    HAVE_XLSXWRITER = False
+
 
 def load_images_to_annotate(images_file: str) -> List[Tuple[str, str]]:
     """
@@ -342,26 +349,125 @@ def create_master_file(
         }
         csv_data.append(row)
     
-    # Write the master CSV file
+    # Define the fieldnames for the CSV file
     fieldnames = [
         "case_id", "page_id", "image_file_path", "label_file_path", 
         "assignee1", "has_assignee1_completed", 
         "assignee2", "has_assignee2_completed", "notes"
     ]
     
-    # Write the CSV file manually to avoid automatic quote escaping
-    with open(master_file, 'w', newline='') as csvfile:
-        # Write header
-        header_line = ','.join(fieldnames) + '\n'
-        csvfile.write(header_line)
-        
-        # Write each row manually
-        for row in csv_data:
-            # Format hyperlinks exactly as needed without automatic escaping
-            line = f"{row['case_id']},{row['page_id']},\"=HYPERLINK(\"{row['image_file_path']}\",\"View image\")\",\"=HYPERLINK(\"{row['label_file_path']}\",\"View labels\")\",{row['assignee1']},{row['has_assignee1_completed']},{row['assignee2']},{row['has_assignee2_completed']},{row['notes']}\n"
-            csvfile.write(line)
+    # Format the data for CSV output with proper hyperlinks for Excel
+    formatted_rows = []
+    hyperlink_data = []  # Store data for XLSX generation
     
-    print(f"Created master tracking file with {len(csv_data)} entries: {master_file}")
+    for row in csv_data:
+        current_case_id = row['case_id']
+        current_page_id = row['page_id']
+        
+        # Create properly formatted hyperlinks for Excel
+        image_path = f"Z:Document Understanding\\information_extraction\\gold\\doc filter\\2025 eval set\\annotation_images\\{current_case_id}_{current_page_id}.jpeg"
+        label_path = f"Z:Document Understanding\\information_extraction\\gold\\doc filter\\2025 eval set\\annotation_labels\\{current_case_id}_{current_page_id}.csv"
+        
+        # Store the formatted row for CSV
+        formatted_row = {
+            "case_id": row['case_id'],
+            "page_id": row['page_id'],
+            "image_file_path": f'=HYPERLINK("{image_path}","View image")',
+            "label_file_path": f'=HYPERLINK("{label_path}","View labels")',
+            "assignee1": row['assignee1'],
+            "has_assignee1_completed": row['has_assignee1_completed'],
+            "assignee2": row['assignee2'],
+            "has_assignee2_completed": row['has_assignee2_completed'],
+            "notes": row['notes']
+        }
+        formatted_rows.append(formatted_row)
+        
+        # Store the raw data for XLSX creation
+        hyperlink_data.append({
+            "case_id": current_case_id,
+            "page_id": current_page_id,
+            "image_path": image_path,
+            "label_path": label_path,
+            "assignee1": row['assignee1'],
+            "has_assignee1_completed": row['has_assignee1_completed'],
+            "assignee2": row['assignee2'],
+            "has_assignee2_completed": row['has_assignee2_completed'],
+            "notes": row['notes']
+        })
+    
+    # Write the CSV file manually to avoid automatic escaping
+    with open(master_file, 'w', newline='') as f:
+        # Write header
+        f.write(','.join(fieldnames) + '\n')
+        
+        # Write each row manually with exact formatting
+        for row in formatted_rows:
+            # For non-hyperlink fields
+            normal_fields = [
+                row['case_id'], 
+                row['page_id'],
+                f'"{row["image_file_path"]}"',  # Quoted hyperlink
+                f'"{row["label_file_path"]}"',  # Quoted hyperlink
+                row['assignee1'],
+                row['has_assignee1_completed'],
+                row['assignee2'],
+                row['has_assignee2_completed'],
+                row['notes']
+            ]
+            f.write(','.join(normal_fields) + '\n')
+    
+    # Also create an Excel file if xlsxwriter is available
+    excel_file = os.path.splitext(master_file)[0] + '.xlsx'
+    if HAVE_XLSXWRITER:
+        try:
+            # Create the Excel file with proper hyperlinks
+            workbook = xlsxwriter.Workbook(excel_file)
+            worksheet = workbook.add_worksheet('Annotation Master')
+            
+            # Create formats
+            header_format = workbook.add_format({'bold': True})
+            link_format = workbook.add_format({
+                'font_color': 'blue',
+                'underline': 1
+            })
+            
+            # Write header row
+            for col, field in enumerate(fieldnames):
+                worksheet.write(0, col, field, header_format)
+            
+            # Write data rows
+            for row_idx, row_data in enumerate(hyperlink_data, start=1):
+                # Write regular cells
+                worksheet.write(row_idx, 0, row_data['case_id'])
+                worksheet.write(row_idx, 1, row_data['page_id'])
+                
+                # Write hyperlinks
+                worksheet.write_formula(
+                    row_idx, 2, 
+                    f'HYPERLINK("{row_data["image_path"]}","View image")', 
+                    link_format
+                )
+                worksheet.write_formula(
+                    row_idx, 3, 
+                    f'HYPERLINK("{row_data["label_path"]}","View labels")', 
+                    link_format
+                )
+                
+                # Write remaining cells
+                worksheet.write(row_idx, 4, row_data['assignee1'])
+                worksheet.write(row_idx, 5, row_data['has_assignee1_completed'])
+                worksheet.write(row_idx, 6, row_data['assignee2'])
+                worksheet.write(row_idx, 7, row_data['has_assignee2_completed'])
+                worksheet.write(row_idx, 8, row_data['notes'])
+            
+            workbook.close()
+            print(f"Created master XLSX file: {excel_file}")
+        except Exception as e:
+            print(f"Warning: Failed to create Excel file: {str(e)}")
+    else:
+        print(f"Note: XlsxWriter package not available. Install it with 'pip install xlsxwriter' to create Excel files.")
+    
+    print(f"Created master CSV file: {master_file}")
 
 
 def main() -> None:
@@ -454,6 +560,9 @@ def main() -> None:
         print(f"- Copied {len(copied_images)} image files to {args.images_dir}")
     print(f"- Generated {len(successful_files)} annotation files in {args.labels_dir}")
     print(f"- Created master tracking file: {args.master_file}")
+    if HAVE_XLSXWRITER:
+        excel_file = os.path.splitext(args.master_file)[0] + '.xlsx'
+        print(f"  Also created Excel file: {excel_file}")
     print(f"- Images path in master file: {args.network_share}\\annotation_images\\")
     print(f"- Labels path in master file: {args.network_share}\\annotation_labels\\")
     
