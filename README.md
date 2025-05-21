@@ -59,10 +59,30 @@ Each df_check.csv file contains LayoutLM processing results with the following c
 - `block_ids` - Block identifier 
 - `word_ids` - Word identifier
 - `words` - Text content
-- `bboxes` - Bounding box coordinates
+- `bboxes` - Bounding box coordinates in format "(ul_x, ul_y, lr_x, lr_y)" where ul = upper-left, lr = lower-right
 - `labels` - Original label
 - `pred` - Prediction value
 - `prob` - Probability score
+
+## How Annotation Files are Constructed
+
+The CSV files in the `annotation_labels` directory are created through the following process:
+
+1. The `prepare_annotations.py` script reads a list of images to annotate from `data/annotation_images.csv`
+   - This CSV contains case_id and page_id columns (e.g., 1-12ABCDEF and 9876543210_01_0)
+
+2. For each case and page combination in the list:
+   - The script locates the source data in `du_cases/<case_id>/processing/form-recogniser/df_check.csv`
+   - These source files contain data for multiple images within a case
+
+3. The script then:
+   - Filters rows from the source file for just the specific image_id (page_id)
+   - Creates a new Excel file in the annotation_labels directory named `<case_id>_<page_id>.xlsx`
+   - Extracts x1, y1, x2, y2 coordinates from the bboxes column and adds separate columns
+   - Adds an additional empty column called "annotator_label" for human annotations
+   - Formats the Excel file with auto-filtering and proper column types for sorting
+
+4. The resulting Excel files in annotation_labels contain only the rows relevant to a specific image, making it easier for annotators to focus on just the data they need to annotate and sort/filter content as needed.
 
 ## File Formats
 
@@ -103,6 +123,25 @@ Annotator-specific Excel files for each case, containing only the columns releva
 
 Each annotator has their own directory containing case files, preventing annotators from overwriting each other's work. This organization makes it easier to distribute specific cases to specific annotators.
 
+### annotation_labels/*.xlsx
+Generated Excel files containing:
+- All columns from the source df_check.csv (image_id, block_ids, word_ids, words, bboxes, labels, pred, prob)
+- Four additional coordinate columns (x1, y1, x2, y2) extracted from the bboxes column
+- An empty "annotator_label" column for human annotations
+
+Features:
+- Excel format allows sorting by any column, including the coordinate columns
+- Auto-filtering enabled to easily filter rows
+- Numeric coordinate columns for proper sorting by position
+- Column widths adjusted for readability
+- Frozen header row for easier navigation
+
+Example row:
+```
+image_id,block_ids,word_ids,words,bboxes,x1,y1,x2,y2,labels,pred,prob,annotator_label
+9876543210_01_0,1,10,form,"(10, 20, 100, 40)",10,20,100,40,FIELD,0,0.95,
+```
+
 ## Workflow
 
 The typical workflow for using this system is:
@@ -130,17 +169,20 @@ To prepare annotation files for a specific list of images:
 # Using mapped Z: drive (recommended for our environment)
 ./prepare_annotations.py --network-share "Z:Document Understanding\information_extraction\gold\doc filter\2025 gold eval set"
 
-# Or simply use the drive letter for the root directory
-./prepare_annotations.py --network-share Z:
+# Using an external output directory (for KFP prod environments)
+./prepare_annotations.py --output-dir /efs/shared/dev-de/ude5g
+
+# Quiet mode (minimal output)
+./prepare_annotations.py --quiet
 ```
 
 This single script will:
 1. Read the list of images from `data/annotation_images.csv`
-2. Generate annotation files only for those images in the `annotation_labels/` directory
-3. Create a master tracking file in `data/master.xlsx` with clickable hyperlinks
-4. Create separate annotator directories in `data/cases/` for each annotator
-5. Generate annotator-specific Excel files for each case in the annotator's directory
-6. Create an index file (`data/cases/index.xlsx`) with links to all annotator-specific case files
+2. Generate annotation files with extracted bounding box coordinates
+3. Create a master tracking file with clickable hyperlinks
+4. Create separate annotator directories for each annotator
+5. Generate annotator-specific Excel files for each case
+6. Create an index file with links to all annotator-specific case files
 7. Provide a summary of how many images were processed
 
 ## Scripts
@@ -150,15 +192,16 @@ This single script will:
 Create annotation files for the specified images and generate a master tracking file:
 
 ```bash
-# Using mapped Z: drive with complete path (recommended for our environment)
+# Using mapped Z: drive with complete path
 ./prepare_annotations.py --network-share "Z:Document Understanding\information_extraction\gold\doc filter\2025 gold eval set"
 ```
 
 Options:
-- `--cases-dir`: Directory containing the DU-SSD LayoutLM outputs (default: du_cases)
+- `--cases-dir`: Directory containing the DU-SSD LayoutLM outputs (default: /efs/shared/prod/doc-und/cases)
 - `--labels-dir`: Directory where annotation files will be saved (default: annotation_labels)
 - `--images-dir`: Directory where image files will be copied (default: annotation_images)
 - `--images-file`: CSV file listing images to annotate (default: data/annotation_images.csv)
+- `--output-dir`: Output directory for all generated files (override defaults for master-file, labels-dir, etc.)
 - `--master-file`: Path for the master tracking file (default: data/master.xlsx)
 - `--network-share`: Network share path where files will be copied
 - `--csv-path-template`: Template for CSV file paths with variables {case_dir}, {case_id}, {page_id}
@@ -167,6 +210,47 @@ Options:
 - `--annotators`: List of annotator names (default: annotator1 annotator2)
 - `--split-by-case`: Split the master file into separate Excel files for each case_id (default: enabled)
 - `--no-split-by-case`: Do not create separate Excel files for each case_id
+- `--verbose`: Enable verbose logging (DEBUG level)
+- `--quiet`: Reduce output to warnings and errors only
+
+#### Specifying an Output Directory
+
+The `--output-dir` parameter allows you to specify an external location for all output files. This is particularly useful for KFP production environments where data needs to be stored outside the source directory:
+
+```bash
+./prepare_annotations.py --output-dir /efs/shared/dev-de/ude5g --cases-dir /efs/shared/prod/doc-und/cases
+```
+
+This will create the following structure:
+```
+/efs/shared/dev-de/ude5g/
+├── annotation_images/      # Copied images
+├── annotation_labels/      # Generated CSV files 
+├── master.xlsx             # Master tracking file
+└── cases/                  # Case-specific files
+    ├── annotator1/         
+    ├── annotator2/         
+    └── index.xlsx          # Index of cases
+```
+
+#### Controlling Output Verbosity
+
+The script supports three levels of output verbosity:
+
+- **Normal mode** - Standard information messages:
+  ```bash
+  ./prepare_annotations.py
+  ```
+
+- **Verbose mode** - Detailed debug information:
+  ```bash
+  ./prepare_annotations.py --verbose
+  ```
+
+- **Quiet mode** - Only warnings and errors:
+  ```bash
+  ./prepare_annotations.py --quiet
+  ```
 
 ### update_master_file.py
 
@@ -200,6 +284,35 @@ Available report types:
 - `annotator` - Annotator productivity
 - `all` - Generate all report types (default)
 
+## Annotation File Format Enhancements
+
+The annotation files now feature two key improvements:
+
+### 1. Excel Format with Sorting Capabilities
+
+Annotation files are now saved as Excel (.xlsx) files instead of CSV, which provides:
+- Ability to sort data by any column, including coordinate values
+- Auto-filtering to quickly isolate specific items
+- Formatted headers for better readability
+- Proper numeric data types for coordinates
+- Frozen header row to keep column names visible while scrolling
+
+### 2. Extracted Coordinate Columns
+
+The files include separate columns for bounding box coordinates, making it easier to work with the data:
+
+- **Original bboxes column** - Contains the raw bounding box coordinates: `"(10, 20, 100, 40)"`
+- **Extracted coordinate columns**:
+  - `x1`: Upper-left x-coordinate (10)
+  - `y1`: Upper-left y-coordinate (20)
+  - `x2`: Lower-right x-coordinate (100)
+  - `y2`: Lower-right y-coordinate (40)
+
+This format simplifies data processing and analysis, especially when:
+- Sorting items by their position on the page (e.g., top-to-bottom using y1)
+- Finding elements within specific regions
+- Calculating areas, overlaps, or visualizing the bounding boxes
+
 ## Troubleshooting Common Issues
 
 ### df_check.csv Errors
@@ -223,3 +336,11 @@ If hyperlinks in Excel don't work correctly:
 2. **Check for extra quotes**: If your hyperlinks have double quotes like `""Z:\path""`, this may be due to Excel's CSV handling. The scripts have been updated to prevent this issue.
 
 3. **Manual fix in Excel**: If hyperlinks still don't work, you can select the columns with hyperlinks in Excel, right-click and choose "Remove Hyperlink", then select all cells again and use the HYPERLINK function to recreate them.
+
+### Output Directory Issues
+
+If you're using the `--output-dir` parameter and see incorrect paths:
+
+1. Make sure the output directory exists or has write permissions
+2. Check for path separators in network share paths - use double backslashes on Windows (\\\\)
+3. For absolute paths, ensure they start with "/" (Unix) or a drive letter (Windows)
