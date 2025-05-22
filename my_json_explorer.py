@@ -5,7 +5,6 @@ JSON Explorer - Tool for exploring and extracting data from JSON files
 
 import json
 import sys
-from pprint import pprint
 
 
 def explore_json(data, path="", max_depth=3, current_depth=0):
