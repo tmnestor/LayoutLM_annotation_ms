@@ -34,7 +34,7 @@ The system works with the existing DU-SSD directory structure where:
 │   │   │   └── ...
 │   │   └── index.xlsx      # Index of all cases with links to annotator files
 │   └── completion_updates.csv # Template for batch updates
-├── du_cases/               # Main case directory structure
+├── /efs/shared/prod/doc-und/cases/  # Main case directory (absolute path)
 │   ├── 1-12ABCDEF/         # Example case directory
 │   │   ├── images/         # Contains all page images for this case
 │   │   │   ├── 9876543210_01_0.jpeg
@@ -42,6 +42,11 @@ The system works with the existing DU-SSD directory structure where:
 │   │   └── processing/
 │   │       └── form-recogniser/ 
 │   │           └── df_check.csv  # LayoutLM processing results
+│   ├── image_id/           # Image ID directory (not inside case directories)
+│   │   └── extracted_text_json/  # JSON extraction results directory
+│   │       ├── 9876543210_01_0.json  # JSON data for specific page
+│   │       ├── 9876543210_02_0.json
+│   │       └── ...
 ├── annotation_images/      # Image files for annotation
 ├── annotation_labels/      # Generated annotation files
 └── reports/                # Generated reports
@@ -49,7 +54,7 @@ The system works with the existing DU-SSD directory structure where:
 
 ## Source Data Format: df_check.csv
 
-The system relies on `df_check.csv` files located in each case directory at `du_cases/{case_id}/processing/form-recogniser/df_check.csv`. These files are critical for creating annotation files.
+The system relies on `df_check.csv` files located in each case directory at `/efs/shared/prod/doc-und/cases/{case_id}/processing/form-recogniser/df_check.csv`. These files are critical for creating annotation files.
 
 ### df_check.csv Format
 
@@ -72,7 +77,7 @@ The CSV files in the `annotation_labels` directory are created through the follo
    - This CSV contains case_id and page_id columns (e.g., 1-12ABCDEF and 9876543210_01_0)
 
 2. For each case and page combination in the list:
-   - The script locates the source data in `du_cases/<case_id>/processing/form-recogniser/df_check.csv`
+   - The script locates the source data in `/efs/shared/prod/doc-und/cases/<case_id>/processing/form-recogniser/df_check.csv`
    - These source files contain data for multiple images within a case
 
 3. The script then:
