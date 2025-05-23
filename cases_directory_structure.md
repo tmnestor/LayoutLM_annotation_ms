@@ -11,20 +11,23 @@ This document outlines the directory structure for the Document Understanding (D
 │   │   ├── 9876543210_01_0.jpeg
 │   │   ├── 9876543210_02_0.jpeg
 │   │   └── ...
+│   ├── image_id/              # Image ID directory inside case directory
+│   │   └── extracted_text_json/   # JSON extraction results directory
+│   │       ├── 9876543210_01_0.json  # JSON data for specific page
+│   │       ├── 9876543210_02_0.json
+│   │       └── ...
 │   └── processing/            # Processing results
 │       └── form-recogniser/   # LayoutLM processing outputs
 │           └── df_check.csv   # Results for all pages in this case
 ├── 1-15XYZWQP/                # Another case directory
 │   ├── images/
 │   │   └── ...
+│   ├── image_id/
+│   │   └── extracted_text_json/
+│   │       └── ...
 │   └── processing/
 │       └── form-recogniser/
 │           └── df_check.csv
-├── image_id/                  # Image ID directory (not inside case directories)
-│   └── extracted_text_json/   # JSON extraction results directory
-│       ├── 9876543210_01_0.json  # JSON data for specific page
-│       ├── 9876543210_02_0.json
-│       └── ...
 └── ...                        # More case directories
 ```
 
@@ -45,8 +48,8 @@ The `images/` subdirectory contains the original document images with the naming
 
 ### JSON Files
 
-The `/efs/shared/prod/doc-und/cases/image_id/extracted_text_json/` directory contains:
-- JSON data files for each page across all cases
+The `image_id/extracted_text_json/` directory within each case contains:
+- JSON data files for each page within that specific case
 - Each JSON file is named after its corresponding image
 - Format: `DDDDDDDDDD_DD_D.json`
 - Contains structured extracted text data from the corresponding image
