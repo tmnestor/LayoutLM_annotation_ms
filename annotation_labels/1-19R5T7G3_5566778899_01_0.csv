@@ -1,4 +1,0 @@
-image_id,block_ids,word_ids,words,bboxes,labels,pred,prob,annotator_label
-5566778899_01_0,19,30,contract,"(30, 40, 130, 60)",HEADER,0,0.89,
-5566778899_01_0,20,31,agreement,"(150, 45, 250, 65)",TITLE,0,0.92,
-5566778899_01_0,21,32,terms,"(275, 50, 375, 70)",CONTENT,1,0.84,

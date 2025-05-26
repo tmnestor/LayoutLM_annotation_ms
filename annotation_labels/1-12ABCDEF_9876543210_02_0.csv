@@ -1,4 +1,0 @@
-image_id,block_ids,word_ids,words,bboxes,labels,pred,prob,annotator_label
-9876543210_02_0,4,13,date,"(50, 60, 150, 80)",DATE,1,0.92,
-9876543210_02_0,5,14,signature,"(200, 65, 300, 85)",SIGNATURE,1,0.89,
-9876543210_02_0,6,15,total,"(350, 70, 450, 90)",AMOUNT,1,0.94,

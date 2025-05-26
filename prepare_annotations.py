@@ -437,42 +437,24 @@ def create_annotation_file(annotation_file: str, headers_with_labels: List[str],
 def add_data_validation(worksheet, headers_with_labels: List[str], image_rows: List[List[str]]) -> None:
     """Add dropdown data validation for annotator label columns."""
     try:
-        # Hardcoded list of common annotation labels
-        standard_labels = [
-            'O',  # Outside/Other
-            'B-PER', 'I-PER',  # Person
-            'B-ORG', 'I-ORG',  # Organization  
-            'B-LOC', 'I-LOC',  # Location
-            'B-DATE', 'I-DATE',  # Date
-            'B-MONEY', 'I-MONEY',  # Money
-            'B-MISC', 'I-MISC',  # Miscellaneous
-            'B-ADDRESS', 'I-ADDRESS',  # Address
-            'B-PHONE', 'I-PHONE',  # Phone
-            'B-EMAIL', 'I-EMAIL',  # Email
-            'HEADER', 'FOOTER', 'TITLE'  # Document structure
-        ]
-        
-        # Create validation list
-        label_list = ','.join(standard_labels)
+        # Shorter list to avoid Excel issues
+        standard_labels = ['O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC']
         
         # Find annotator columns
         ann1_idx = headers_with_labels.index('annotator1_label')
         ann2_idx = headers_with_labels.index('annotator2_label')
         
-        # Add validation to annotator columns (use proper range)
-        max_row = len(image_rows) + 1  # +1 for header row
-        worksheet.data_validation(1, ann1_idx, max_row, ann1_idx, {
-            'validate': 'list',
-            'source': label_list,
-            'show_input': True,
-            'show_error': True
-        })
-        worksheet.data_validation(1, ann2_idx, max_row, ann2_idx, {
-            'validate': 'list', 
-            'source': label_list,
-            'show_input': True,
-            'show_error': True
-        })
+        # Use proper Excel range format and simpler validation
+        max_row = len(image_rows)
+        if max_row > 0:
+            worksheet.data_validation(1, ann1_idx, max_row, ann1_idx, {
+                'validate': 'list',
+                'source': standard_labels
+            })
+            worksheet.data_validation(1, ann2_idx, max_row, ann2_idx, {
+                'validate': 'list',
+                'source': standard_labels
+            })
     except (ValueError, IndexError):
         pass  # Skip if columns not found
 
@@ -480,21 +462,21 @@ def add_data_validation(worksheet, headers_with_labels: List[str], image_rows: L
 def add_conditional_formatting(workbook, worksheet, headers_with_labels: List[str], num_rows: int) -> None:
     """Add conditional formatting to highlight high-confidence predictions."""
     try:
-        prob_idx = headers_with_labels.index('prob')
+        # Find prob column in the final headers (after bbox columns are inserted)
+        prob_idx = None
+        for i, header in enumerate(headers_with_labels):
+            if header == 'prob':
+                prob_idx = i
+                break
+        
+        if prob_idx is None:
+            return  # Skip if prob column not found
         
         # Use the actual number of data rows + header
         max_row = num_rows + 1
         
-        # Green for high confidence (>0.8)
-        green_format = workbook.add_format({'bg_color': '#C6EFCE'})
-        worksheet.conditional_format(1, prob_idx, max_row, prob_idx, {
-            'type': 'cell',
-            'criteria': '>',
-            'value': 0.8,
-            'format': green_format
-        })
-        
-        # Yellow for medium confidence (0.5-0.8)  
+        # Apply rules in order - Excel uses first matching rule
+        # Yellow for medium confidence (0.5 <= x <= 0.8)
         yellow_format = workbook.add_format({'bg_color': '#FFEB9C'})
         worksheet.conditional_format(1, prob_idx, max_row, prob_idx, {
             'type': 'cell',
@@ -503,8 +485,17 @@ def add_conditional_formatting(workbook, worksheet, headers_with_labels: List[st
             'maximum': 0.8,
             'format': yellow_format
         })
-    except ValueError:
-        pass  # Skip if prob column not found
+        
+        # Green for high confidence (>0.8) - this will override yellow for >0.8 values
+        green_format = workbook.add_format({'bg_color': '#C6EFCE'})
+        worksheet.conditional_format(1, prob_idx, max_row, prob_idx, {
+            'type': 'cell',
+            'criteria': '>',
+            'value': 0.8,
+            'format': green_format
+        })
+    except Exception:
+        pass  # Skip if any error occurs
 
 
 def generate_annotation_files(
@@ -1026,7 +1017,7 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--cases-dir",
-        default="/efs/shared/prod/doc-und/cases",
+        default="du_cases",
         help="Directory containing the case structure (default: /efs/shared/prod/doc-und/cases)",
     )
     parser.add_argument(
@@ -1059,7 +1050,7 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--network-share",
-        default="Z:Document Understanding\\information_extraction\\gold\\doc filter\\2025 gold eval set",
+        default="data",
         help="Network share path for hyperlinks (default: Z:Document Understanding\\information_extraction\\gold\\doc filter\\2025 gold eval set)",
     )
     parser.add_argument(

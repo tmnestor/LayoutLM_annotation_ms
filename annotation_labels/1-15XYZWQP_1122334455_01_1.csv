@@ -1,4 +1,0 @@
-image_id,block_ids,word_ids,words,bboxes,labels,pred,prob,annotator_label
-1122334455_01_1,10,20,customer,"(15, 25, 120, 45)",FIELD,0,0.91,
-1122334455_01_1,11,21,details,"(150, 30, 250, 50)",VALUE,1,0.85,
-1122334455_01_1,12,22,address,"(275, 35, 375, 55)",ADDRESS,1,0.93,
