@@ -400,12 +400,13 @@ def create_annotation_file(annotation_file: str, headers_with_labels: List[str],
                     # Update offset for remaining columns
                     col_offset = 4
             
-            # Add empty annotator_label column at the end
-            worksheet.write(row_idx, len(row) + col_offset, "")
+            # Add empty annotator label columns at the end
+            worksheet.write(row_idx, len(row) + col_offset, "")      # annotator1_label
+            worksheet.write(row_idx, len(row) + col_offset + 1, "")  # annotator2_label
         
         # Set column widths for better readability
         for col_idx, header in enumerate(headers_with_labels):
-            if header in ['image_id', 'page_id', 'annotator_label']:
+            if header in ['image_id', 'page_id', 'annotator1_label', 'annotator2_label']:
                 worksheet.set_column(col_idx, col_idx, 15)
             elif header in ['bboxes']:
                 worksheet.set_column(col_idx, col_idx, 18)
@@ -419,12 +420,83 @@ def create_annotation_file(annotation_file: str, headers_with_labels: List[str],
         # Freeze the header row
         worksheet.freeze_panes(1, 0)
         
+        # Add data validation for dropdowns
+        add_data_validation(worksheet, headers_with_labels, image_rows)
+        
+        # Add conditional formatting
+        add_conditional_formatting(workbook, worksheet, headers_with_labels)
+        
         workbook.close()
         logger.info(f"Created annotation Excel file: {excel_file}")
         return True
     except Exception as e:
         logger.error(f"Error writing annotation Excel file: {str(e)}")
         return False
+
+
+def add_data_validation(worksheet, headers_with_labels: List[str], image_rows: List[List[str]]) -> None:
+    """Add dropdown data validation for annotator label columns."""
+    try:
+        # Hardcoded list of common annotation labels
+        standard_labels = [
+            'O',  # Outside/Other
+            'B-PER', 'I-PER',  # Person
+            'B-ORG', 'I-ORG',  # Organization  
+            'B-LOC', 'I-LOC',  # Location
+            'B-DATE', 'I-DATE',  # Date
+            'B-MONEY', 'I-MONEY',  # Money
+            'B-MISC', 'I-MISC',  # Miscellaneous
+            'B-ADDRESS', 'I-ADDRESS',  # Address
+            'B-PHONE', 'I-PHONE',  # Phone
+            'B-EMAIL', 'I-EMAIL',  # Email
+            'HEADER', 'FOOTER', 'TITLE'  # Document structure
+        ]
+        
+        # Create validation list
+        label_list = ','.join(standard_labels)
+        
+        # Find annotator columns
+        ann1_idx = headers_with_labels.index('annotator1_label')
+        ann2_idx = headers_with_labels.index('annotator2_label')
+        
+        # Add validation to annotator columns
+        worksheet.data_validation(1, ann1_idx, len(image_rows), ann1_idx, {
+            'validate': 'list',
+            'source': label_list
+        })
+        worksheet.data_validation(1, ann2_idx, len(image_rows), ann2_idx, {
+            'validate': 'list', 
+            'source': label_list
+        })
+    except (ValueError, IndexError):
+        pass  # Skip if columns not found
+
+
+def add_conditional_formatting(workbook, worksheet, headers_with_labels: List[str]) -> None:
+    """Add conditional formatting to highlight high-confidence predictions."""
+    try:
+        prob_idx = headers_with_labels.index('prob')
+        
+        # Green for high confidence (>0.8)
+        green_format = workbook.add_format({'bg_color': '#C6EFCE'})
+        worksheet.conditional_format(1, prob_idx, 1000, prob_idx, {
+            'type': 'cell',
+            'criteria': '>',
+            'value': 0.8,
+            'format': green_format
+        })
+        
+        # Yellow for medium confidence (0.5-0.8)  
+        yellow_format = workbook.add_format({'bg_color': '#FFEB9C'})
+        worksheet.conditional_format(1, prob_idx, 1000, prob_idx, {
+            'type': 'cell',
+            'criteria': 'between',
+            'minimum': 0.5,
+            'maximum': 0.8,
+            'format': yellow_format
+        })
+    except ValueError:
+        pass  # Skip if prob column not found
 
 
 def generate_annotation_files(
@@ -518,9 +590,9 @@ def generate_annotation_files(
             # No bboxes column, so no bbox coordinates to add
             bbox_idx = -1
             
-        # Add the annotator label column and any bbox columns to headers
+        # Add the annotator label columns and any bbox columns to headers
         headers_with_label = (
-            headers[:bbox_idx+1] + bbox_columns + headers[bbox_idx+1:] + ["annotator_label"]
+            headers[:bbox_idx+1] + bbox_columns + headers[bbox_idx+1:] + ["annotator1_label", "annotator2_label"]
         )
 
         # Find the page_id column

@@ -39,11 +39,10 @@ The system works with the existing DU-SSD directory structure where:
 │   │   ├── images/         # Contains all page images for this case
 │   │   │   ├── 9876543210_01_0.jpeg
 │   │   │   └── ...
-│   │   ├── image_id/       # Image ID directory for this case
-│   │   │   └── extracted_text_json/  # JSON extraction results
-│   │   │       ├── 9876543210_01_0.json  # JSON data for specific page
-│   │   │       ├── 9876543210_02_0.json
-│   │   │       └── ...
+│   │   ├── extracted_text_json/  # JSON extraction results (directly under case)
+│   │   │   ├── 9876543210_01_0.json  # JSON data for specific page
+│   │   │   ├── 9876543210_02_0.json
+│   │   │   └── ...
 │   │   └── processing/
 │   │       └── form-recogniser/ 
 │   │           └── df_check.csv  # LayoutLM processing results
