@@ -424,7 +424,7 @@ def create_annotation_file(annotation_file: str, headers_with_labels: List[str],
         add_data_validation(worksheet, headers_with_labels, image_rows)
         
         # Add conditional formatting
-        add_conditional_formatting(workbook, worksheet, headers_with_labels)
+        add_conditional_formatting(workbook, worksheet, headers_with_labels, len(image_rows))
         
         workbook.close()
         logger.info(f"Created annotation Excel file: {excel_file}")
@@ -459,27 +459,35 @@ def add_data_validation(worksheet, headers_with_labels: List[str], image_rows: L
         ann1_idx = headers_with_labels.index('annotator1_label')
         ann2_idx = headers_with_labels.index('annotator2_label')
         
-        # Add validation to annotator columns
-        worksheet.data_validation(1, ann1_idx, len(image_rows), ann1_idx, {
+        # Add validation to annotator columns (use proper range)
+        max_row = len(image_rows) + 1  # +1 for header row
+        worksheet.data_validation(1, ann1_idx, max_row, ann1_idx, {
             'validate': 'list',
-            'source': label_list
+            'source': label_list,
+            'show_input': True,
+            'show_error': True
         })
-        worksheet.data_validation(1, ann2_idx, len(image_rows), ann2_idx, {
+        worksheet.data_validation(1, ann2_idx, max_row, ann2_idx, {
             'validate': 'list', 
-            'source': label_list
+            'source': label_list,
+            'show_input': True,
+            'show_error': True
         })
     except (ValueError, IndexError):
         pass  # Skip if columns not found
 
 
-def add_conditional_formatting(workbook, worksheet, headers_with_labels: List[str]) -> None:
+def add_conditional_formatting(workbook, worksheet, headers_with_labels: List[str], num_rows: int) -> None:
     """Add conditional formatting to highlight high-confidence predictions."""
     try:
         prob_idx = headers_with_labels.index('prob')
         
+        # Use the actual number of data rows + header
+        max_row = num_rows + 1
+        
         # Green for high confidence (>0.8)
         green_format = workbook.add_format({'bg_color': '#C6EFCE'})
-        worksheet.conditional_format(1, prob_idx, 1000, prob_idx, {
+        worksheet.conditional_format(1, prob_idx, max_row, prob_idx, {
             'type': 'cell',
             'criteria': '>',
             'value': 0.8,
@@ -488,7 +496,7 @@ def add_conditional_formatting(workbook, worksheet, headers_with_labels: List[st
         
         # Yellow for medium confidence (0.5-0.8)  
         yellow_format = workbook.add_format({'bg_color': '#FFEB9C'})
-        worksheet.conditional_format(1, prob_idx, 1000, prob_idx, {
+        worksheet.conditional_format(1, prob_idx, max_row, prob_idx, {
             'type': 'cell',
             'criteria': 'between',
             'minimum': 0.5,
