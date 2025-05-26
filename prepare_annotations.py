@@ -437,24 +437,44 @@ def create_annotation_file(annotation_file: str, headers_with_labels: List[str],
 def add_data_validation(worksheet, headers_with_labels: List[str], image_rows: List[List[str]]) -> None:
     """Add dropdown data validation for annotator label columns."""
     try:
-        # Shorter list to avoid Excel issues
-        standard_labels = ['O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC']
+        # Test with larger list (58 values)
+        standard_labels = [
+            'O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC', 'B-DATE', 'I-DATE',
+            'B-MONEY', 'I-MONEY', 'B-MISC', 'I-MISC', 'B-ADDRESS', 'I-ADDRESS', 'B-PHONE', 'I-PHONE',
+            'B-EMAIL', 'I-EMAIL', 'B-URL', 'I-URL', 'B-PRODUCT', 'I-PRODUCT', 'B-EVENT', 'I-EVENT',
+            'B-TITLE', 'I-TITLE', 'B-QUANTITY', 'I-QUANTITY', 'B-ORDINAL', 'I-ORDINAL', 'B-CARDINAL', 'I-CARDINAL',
+            'B-FACILITY', 'I-FACILITY', 'B-GPE', 'I-GPE', 'B-LANGUAGE', 'I-LANGUAGE', 'B-NORP', 'I-NORP',
+            'B-WORK_OF_ART', 'I-WORK_OF_ART', 'B-LAW', 'I-LAW', 'B-TIME', 'I-TIME', 'B-PERCENT', 'I-PERCENT',
+            'HEADER', 'FOOTER', 'TITLE', 'SUBTITLE', 'PARAGRAPH', 'LIST_ITEM', 'TABLE_HEADER', 'TABLE_CELL',
+            'CAPTION', 'FOOTNOTE', 'PAGE_NUMBER', 'SECTION'
+        ]
         
         # Find annotator columns
         ann1_idx = headers_with_labels.index('annotator1_label')
         ann2_idx = headers_with_labels.index('annotator2_label')
         
-        # Use proper Excel range format and simpler validation
+        # Write labels to a hidden column for formula range (Excel's 255 char limit workaround)
+        label_col = len(headers_with_labels)  # Use column after the last data column
+        for i, label in enumerate(standard_labels):
+            worksheet.write(i + 1, label_col, label)  # Write starting from row 2
+        
+        # Create formula range reference
+        range_formula = f'${chr(65 + label_col)}$2:${chr(65 + label_col)}${len(standard_labels) + 1}'
+        
+        # Use proper Excel range format with formula range
         max_row = len(image_rows)
         if max_row > 0:
             worksheet.data_validation(1, ann1_idx, max_row, ann1_idx, {
                 'validate': 'list',
-                'source': standard_labels
+                'source': range_formula
             })
             worksheet.data_validation(1, ann2_idx, max_row, ann2_idx, {
                 'validate': 'list',
-                'source': standard_labels
+                'source': range_formula
             })
+            
+        # Hide the labels column
+        worksheet.set_column(label_col, label_col, None, None, {'hidden': True})
     except (ValueError, IndexError):
         pass  # Skip if columns not found
 
