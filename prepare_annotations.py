@@ -181,6 +181,125 @@ def extract_bbox_coordinates(bbox_str: str) -> List[str]:
     return coords
 
 
+def deduplicate_predictions(rows: List[List[str]], headers: List[str]) -> List[List[str]]:
+    """
+    Deduplicate rows by keeping only the highest probability prediction for each unique word/position.
+    
+    This handles the case where the model was configured for top-k predictions instead of single
+    best prediction, resulting in multiple rows for the same word with different pred/prob values.
+    
+    Args:
+        rows: List of CSV data rows
+        headers: List of CSV header column names
+        
+    Returns:
+        List of deduplicated rows with only the highest probability prediction for each unique word
+    """
+    if not rows or not headers:
+        return rows
+    
+    # Find required column indices
+    try:
+        prob_idx = headers.index('prob')
+    except ValueError:
+        # If no prob column, can't deduplicate by probability
+        logger.warning("No 'prob' column found - cannot deduplicate by probability")
+        return rows
+    
+    # Find columns that define unique word/position combinations
+    key_columns = []
+    for col_name in ['page_id', 'block_ids', 'word_ids', 'bboxes']:
+        try:
+            key_columns.append(headers.index(col_name))
+        except ValueError:
+            # Use alternative column names for compatibility
+            if col_name == 'page_id':
+                try:
+                    key_columns.append(headers.index('image_id'))
+                except ValueError:
+                    pass
+    
+    if not key_columns:
+        logger.warning("Cannot find key columns for deduplication")
+        return rows
+    
+    # Group rows by unique key and keep highest probability
+    best_rows = {}
+    
+    for row in rows:
+        if len(row) <= max(key_columns + [prob_idx]):
+            continue  # Skip malformed rows
+        
+        # Create unique key from key columns
+        key = tuple(row[col_idx] for col_idx in key_columns)
+        
+        # Convert probability to float for comparison
+        try:
+            prob = float(row[prob_idx])
+        except (ValueError, IndexError):
+            prob = 0.0
+        
+        # Keep row with highest probability for this key
+        if key not in best_rows or prob > best_rows[key][1]:
+            best_rows[key] = (row, prob)
+    
+    # Extract deduplicated rows
+    deduplicated_rows = [row_prob[0] for row_prob in best_rows.values()]
+    
+    logger.info(f"Deduplicated {len(rows)} rows to {len(deduplicated_rows)} rows "
+                f"(removed {len(rows) - len(deduplicated_rows)} duplicate predictions)")
+    
+    return deduplicated_rows
+
+
+def sort_rows_reading_order(rows: List[List[str]], headers: List[str]) -> List[List[str]]:
+    """
+    Sort rows in reading order: top to bottom, then left to right.
+    
+    This uses the bounding box coordinates to sort text elements in the natural
+    reading flow of a document, making annotation files more user-friendly.
+    
+    Args:
+        rows: List of CSV data rows
+        headers: List of CSV header column names
+        
+    Returns:
+        List of rows sorted in reading order
+    """
+    if not rows or not headers:
+        return rows
+    
+    # Find bboxes column index
+    try:
+        bbox_idx = headers.index('bboxes')
+    except ValueError:
+        logger.warning("No 'bboxes' column found - cannot sort in reading order")
+        return rows
+    
+    def get_sort_key(row):
+        """Extract sorting coordinates from a row's bounding box."""
+        if len(row) <= bbox_idx:
+            return (float('inf'), float('inf'))  # Put malformed rows at end
+        
+        bbox_str = row[bbox_idx]
+        coords = extract_bbox_coordinates(bbox_str)
+        
+        try:
+            # Extract top-left coordinates (x1, y1) for sorting
+            x1 = float(coords[0]) if coords[0] else float('inf')
+            y1 = float(coords[1]) if coords[1] else float('inf')
+            return (y1, x1)  # Sort by y1 first (top to bottom), then x1 (left to right)
+        except (ValueError, IndexError):
+            return (float('inf'), float('inf'))  # Put invalid coordinates at end
+    
+    # Sort rows by reading order
+    sorted_rows = sorted(rows, key=get_sort_key)
+    
+    logger.info(f"Sorted {len(rows)} rows in reading order (top to bottom, left to right)")
+    
+    return sorted_rows
+
+
 def build_file_path(base_dir: str, case_id: str, template_parts: List[str], 
                    template: Optional[str] = None, **kwargs) -> str:
     """
@@ -420,8 +539,11 @@ def create_annotation_file(annotation_file: str, headers_with_labels: List[str],
         # Freeze the header row
         worksheet.freeze_panes(1, 0)
         
+        # Add validation sheet with sorted labels
+        add_validation_sheet(workbook)
+        
         # Add data validation for dropdowns
-        add_data_validation(worksheet, headers_with_labels, image_rows)
+        add_data_validation(workbook, worksheet, headers_with_labels, image_rows)
         
         # Add conditional formatting
         add_conditional_formatting(workbook, worksheet, headers_with_labels, len(image_rows))
@@ -434,10 +556,57 @@ def create_annotation_file(annotation_file: str, headers_with_labels: List[str],
         return False
 
 
-def add_data_validation(worksheet, headers_with_labels: List[str], image_rows: List[List[str]]) -> None:
-    """Add dropdown data validation for annotator label columns."""
+def add_validation_sheet(workbook) -> None:
+    """Create a separate 'Validation' sheet with sorted validation labels."""
+    # Standard labels for annotation dropdowns (58 values)
+    standard_labels = [
+        'O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC', 'B-DATE', 'I-DATE',
+        'B-MONEY', 'I-MONEY', 'B-MISC', 'I-MISC', 'B-ADDRESS', 'I-ADDRESS', 'B-PHONE', 'I-PHONE',
+        'B-EMAIL', 'I-EMAIL', 'B-URL', 'I-URL', 'B-PRODUCT', 'I-PRODUCT', 'B-EVENT', 'I-EVENT',
+        'B-TITLE', 'I-TITLE', 'B-QUANTITY', 'I-QUANTITY', 'B-ORDINAL', 'I-ORDINAL', 'B-CARDINAL', 'I-CARDINAL',
+        'B-FACILITY', 'I-FACILITY', 'B-GPE', 'I-GPE', 'B-LANGUAGE', 'I-LANGUAGE', 'B-NORP', 'I-NORP',
+        'B-WORK_OF_ART', 'I-WORK_OF_ART', 'B-LAW', 'I-LAW', 'B-TIME', 'I-TIME', 'B-PERCENT', 'I-PERCENT',
+        'HEADER', 'FOOTER', 'TITLE', 'SUBTITLE', 'PARAGRAPH', 'LIST_ITEM', 'TABLE_HEADER', 'TABLE_CELL',
+        'CAPTION', 'FOOTNOTE', 'PAGE_NUMBER', 'SECTION'
+    ]
+    
+    # Sort labels alphabetically for better usability
+    sorted_labels = sorted(standard_labels)
+    
+    # Create the validation sheet
+    validation_sheet = workbook.add_worksheet('Validation')
+    
+    # Create header format
+    header_format = workbook.add_format({
+        'bold': True,
+        'text_wrap': True,
+        'valign': 'top',
+        'fg_color': '#D7E4BC',
+        'border': 1
+    })
+    
+    # Write header
+    validation_sheet.write(0, 0, 'Label Options', header_format)
+    
+    # Write sorted labels starting from row 2 (row 1 = header)
+    for i, label in enumerate(sorted_labels):
+        validation_sheet.write(i + 1, 0, label)
+    
+    # Set column width for readability
+    validation_sheet.set_column(0, 0, 20)
+    
+    # Freeze the header row
+    validation_sheet.freeze_panes(1, 0)
+
+
+def add_data_validation(workbook, worksheet, headers_with_labels: List[str], image_rows: List[List[str]]) -> None:  # noqa: ARG001
+    """Add dropdown data validation for annotator label columns using the Validation sheet."""
     try:
-        # Test with larger list (58 values)
+        # Find annotator columns
+        ann1_idx = headers_with_labels.index('annotator1_label')
+        ann2_idx = headers_with_labels.index('annotator2_label')
+        
+        # Get the number of labels for range calculation
         standard_labels = [
             'O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC', 'B-DATE', 'I-DATE',
             'B-MONEY', 'I-MONEY', 'B-MISC', 'I-MISC', 'B-ADDRESS', 'I-ADDRESS', 'B-PHONE', 'I-PHONE',
@@ -449,19 +618,11 @@ def add_data_validation(worksheet, headers_with_labels: List[str], image_rows: L
             'CAPTION', 'FOOTNOTE', 'PAGE_NUMBER', 'SECTION'
         ]
         
-        # Find annotator columns
-        ann1_idx = headers_with_labels.index('annotator1_label')
-        ann2_idx = headers_with_labels.index('annotator2_label')
+        # Create range reference to the Validation sheet
+        # Range is A2:A59 (58 labels + header row)
+        range_formula = f'Validation!$A$2:$A${len(standard_labels) + 1}'
         
-        # Write labels to a hidden column for formula range (Excel's 255 char limit workaround)
-        label_col = len(headers_with_labels)  # Use column after the last data column
-        for i, label in enumerate(standard_labels):
-            worksheet.write(i + 1, label_col, label)  # Write starting from row 2
-        
-        # Create formula range reference
-        range_formula = f'${chr(65 + label_col)}$2:${chr(65 + label_col)}${len(standard_labels) + 1}'
-        
-        # Use proper Excel range format with formula range
+        # Apply data validation to annotator columns
         max_row = len(image_rows)
         if max_row > 0:
             worksheet.data_validation(1, ann1_idx, max_row, ann1_idx, {
@@ -473,8 +634,6 @@ def add_data_validation(worksheet, headers_with_labels: List[str], image_rows: L
                 'source': range_formula
             })
             
-        # Hide the labels column
-        worksheet.set_column(label_col, label_col, None, None, {'hidden': True})
     except (ValueError, IndexError):
         pass  # Skip if columns not found
 
@@ -619,6 +778,14 @@ def generate_annotation_files(
 
         # Filter rows for this image using exact matching
         image_rows = [row for row in rows if row[page_id_column] == page_id]
+        
+        # Deduplicate rows to keep only highest probability prediction for each unique word/position
+        if image_rows:
+            image_rows = deduplicate_predictions(image_rows, headers)
+            
+        # Sort rows in reading order (top to bottom, left to right)
+        if image_rows:
+            image_rows = sort_rows_reading_order(image_rows, headers)
 
         # Show debug info for the first successful case
         if image_rows and not first_success_debug_shown:
