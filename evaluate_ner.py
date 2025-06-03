@@ -23,11 +23,10 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Optional, Union
 
-import numpy as np
 import pandas as pd
-from sklearn.metrics import classification_report, confusion_matrix, cohen_kappa_score
+from sklearn.metrics import classification_report, cohen_kappa_score
 
 # Configure logging
 logging.basicConfig(
@@ -428,8 +427,8 @@ def evaluate_ner_sequences(file_data: Dict[str, pd.DataFrame]) -> Dict:
     """
     try:
         # Try to import seqeval for proper NER evaluation
-        from seqeval.metrics import classification_report as seq_report
         from seqeval.metrics import accuracy_score as seq_accuracy
+        from seqeval.metrics import classification_report as seq_report
         from seqeval.metrics import f1_score as seq_f1
         
         all_true_sequences = []
@@ -913,7 +912,7 @@ def main() -> None:
     token_metrics = overall.get('token_level', {})
     summary = results.get('evaluation_summary', {})
     
-    print(f"\n=== NER Evaluation Summary ===")
+    print("\n=== NER Evaluation Summary ===")
     print(f"Ground truth annotator: {args.annotator}")
     print(f"Files evaluated: {summary.get('total_files', 0)}")
     print(f"Label mapping: {summary.get('total_entity_labels', 0)} invoice/receipt entities")
@@ -921,7 +920,7 @@ def main() -> None:
     print(f"Token accuracy: {token_metrics.get('token_accuracy', 0):.3f}")
     print(f"Entity F1 (flat): {entity_metrics_flat.get('weighted_f1', 0):.3f}")
     print(f"Entity F1 (BIO): {entity_metrics_bio.get('weighted_f1', 0):.3f}")
-    print(f"\nReports saved:")
+    print("\nReports saved:")
     print(f"  - Markdown: {report_path}")
     print(f"  - JSON: {json_path}")
 
