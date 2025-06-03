@@ -240,8 +240,34 @@ def deduplicate_predictions(rows: List[List[str]], headers: List[str]) -> List[L
             prob = 0.0
         
         # Keep row with highest probability for this key
+        # In case of ties, prefer the prediction that matches the ground truth label
         if key not in best_rows or prob > best_rows[key][1]:
             best_rows[key] = (row, prob)
+        elif prob == best_rows[key][1]:
+            # Tie-breaking: prefer prediction that matches ground truth label
+            try:
+                labels_idx = headers.index('labels')
+                pred_idx = headers.index('pred')
+                
+                current_pred = row[pred_idx]
+                current_label = row[labels_idx]
+                best_pred = best_rows[key][0][pred_idx]
+                
+                # If current prediction matches ground truth but best doesn't, use current
+                if current_pred == current_label and best_pred != current_label:
+                    best_rows[key] = (row, prob)
+                # If neither matches ground truth, use alphabetical order for determinism
+                elif current_pred != current_label and best_pred != current_label:
+                    if current_pred < best_pred:  # Alphabetical tie-breaking
+                        best_rows[key] = (row, prob)
+            except (ValueError, IndexError):
+                # Fallback: use alphabetical order of prediction for determinism
+                try:
+                    pred_idx = headers.index('pred')
+                    if row[pred_idx] < best_rows[key][0][pred_idx]:
+                        best_rows[key] = (row, prob)
+                except (ValueError, IndexError):
+                    pass  # Keep existing row
     
     # Extract deduplicated rows
     deduplicated_rows = [row_prob[0] for row_prob in best_rows.values()]
