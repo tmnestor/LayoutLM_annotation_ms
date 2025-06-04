@@ -516,6 +516,7 @@ def create_annotation_file(
     headers_with_labels: List[str],
     image_rows: List[List[str]],
     bbox_idx: int,
+    original_headers: List[str] = None,
 ) -> bool:
     """
     Create an annotation file in Excel format with the provided data and bbox coordinate columns.
@@ -555,15 +556,37 @@ def create_annotation_file(
             }
         )
 
+        prob_format = workbook.add_format(
+            {
+                "num_format": "0.000",  # Probability format with 3 decimal places
+                "align": "center",
+            }
+        )
+
         # Write the headers
         for col_idx, header in enumerate(headers_with_labels):
             worksheet.write(0, col_idx, header, header_format)
 
-        # Set up auto-filter on the header row to enable sorting
-        worksheet.autofilter(0, 0, len(image_rows), len(headers_with_labels) - 1)
+        # Set up auto-filter on all columns, then hide filter dropdowns except on F and H
+        if len(image_rows) > 0:
+            worksheet.autofilter(0, 0, len(image_rows), len(headers_with_labels) - 1)
+            
+            # Hide filter dropdowns on all columns except F (5) and H (7) using filter_column
+            for col_idx in range(len(headers_with_labels)):
+                if col_idx not in [5, 7]:  # Only show filters on columns F and H
+                    # Use criteria 'blanks' to effectively hide the dropdown while keeping autofilter
+                    worksheet.filter_column(col_idx, 'x != x')  # Always false condition to hide dropdown
 
         # We have 4 coordinate columns after the bbox column if it exists
         # These are added dynamically in the data row processing loop
+
+        # Find prob column index in the original CSV headers
+        prob_col_idx = -1
+        if original_headers:
+            try:
+                prob_col_idx = original_headers.index('prob')
+            except ValueError:
+                pass
 
         # Write the data rows
         for row_idx, row in enumerate(image_rows, start=1):
@@ -571,8 +594,16 @@ def create_annotation_file(
 
             # Process each cell
             for col_idx, value in enumerate(row):
-                # Write the original columns
-                worksheet.write(row_idx, col_idx + col_offset, value)
+                # Convert prob column values to numbers
+                if col_idx == prob_col_idx:
+                    try:
+                        prob_val = float(value)
+                        worksheet.write(row_idx, col_idx + col_offset, prob_val)
+                    except (ValueError, TypeError):
+                        worksheet.write(row_idx, col_idx + col_offset, value)
+                else:
+                    # Write the original columns
+                    worksheet.write(row_idx, col_idx + col_offset, value)
 
                 # After the bboxes column, add coordinate columns
                 if bbox_idx >= 0 and col_idx == bbox_idx:
@@ -599,21 +630,28 @@ def create_annotation_file(
             worksheet.write(row_idx, len(row) + col_offset, "")  # annotator1_label
             worksheet.write(row_idx, len(row) + col_offset + 1, "")  # annotator2_label
 
-        # Set column widths for better readability
+        # Set column widths and visibility
         for col_idx, header in enumerate(headers_with_labels):
-            if header in [
-                "image_id",
-                "page_id",
-                "annotator1_label",
-                "annotator2_label",
-            ]:
-                worksheet.set_column(col_idx, col_idx, 15)
+            # Hide columns A, B, C, H, I, J (0, 1, 2, 7, 8, 9) - F and G (5, 6) are now visible
+            if col_idx in [0, 1, 2, 7, 8, 9]:
+                worksheet.set_column(col_idx, col_idx, None, None, {'hidden': True})
+            elif col_idx == 10:  # Column K (0-indexed, so 10 = column K)
+                # Make column K same width as annotator columns (30)
+                worksheet.set_column(col_idx, col_idx, 30)
+            elif col_idx == 11:  # Column L (0-indexed, so 11 = column L)
+                # Format column L (prob) as number with 3 decimal places
+                worksheet.set_column(col_idx, col_idx, 10, prob_format)
+            elif header in ["annotator1_label", "annotator2_label"]:
+                # Make annotator label columns twice as wide (30 instead of 15)
+                worksheet.set_column(col_idx, col_idx, 30)
             elif header in ["bboxes"]:
                 worksheet.set_column(col_idx, col_idx, 18)
             elif header in ["words"]:
                 worksheet.set_column(col_idx, col_idx, 20)
             elif header in ["x1", "y1", "x2", "y2"]:
                 worksheet.set_column(col_idx, col_idx, 8)
+            elif header in ["image_id", "page_id"]:
+                worksheet.set_column(col_idx, col_idx, 15)
             else:
                 worksheet.set_column(col_idx, col_idx, 10)
 
@@ -735,7 +773,7 @@ def add_validation_sheet(workbook) -> None:
 
 
 def add_data_validation(
-    workbook, worksheet, headers_with_labels: List[str], image_rows: List[List[str]]
+    workbook, worksheet, headers_with_labels: List[str], image_rows: List[List[str]]  # noqa: ARG001
 ) -> None:  # noqa: ARG001
     """Add dropdown data validation for annotator label columns using the Validation sheet."""
     try:
@@ -1050,7 +1088,7 @@ def generate_annotation_files(
         annotation_file = str(Path(labels_dir) / label_file)
 
         if create_annotation_file(
-            annotation_file, headers_with_label, image_rows, bbox_idx
+            annotation_file, headers_with_label, image_rows, bbox_idx, headers
         ):
             successful_files.append((case_id, page_id, image_file, label_file))
         else:
