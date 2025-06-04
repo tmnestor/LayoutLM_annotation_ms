@@ -17,7 +17,7 @@ import logging
 import shutil
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import pandas as pd
 
@@ -330,7 +330,7 @@ def generate_cleanup_report(results: Dict, output_path: Union[str, Path]) -> Non
         report += f"| {result['file']} | {status} | {result['original_rows']:,} | {result['final_rows']:,} | {result['duplicates_removed']:,} | {error} |\n"
     
     if summary.get('failed_files'):
-        report += f"\n## Failed Files\n"
+        report += "\n## Failed Files\n"
         for failed_file in summary['failed_files']:
             report += f"- {failed_file}\n"
     
@@ -430,7 +430,7 @@ def main() -> None:
     
     # Print final summary
     summary = results.get('summary', {})
-    print(f"\n=== Annotation Cleanup Complete ===")
+    print("\n=== Annotation Cleanup Complete ===")
     print(f"Target annotator: {args.annotator}")
     print(f"Files processed: {summary.get('files_processed', 0)}")
     print(f"Files successful: {summary.get('files_successful', 0)}")
